@@ -17,7 +17,7 @@ It allows the user to:
 
 ---
 
-## 🚀 Technologies
+## Technologies
 
 - **React + TypeScript**
 - **Vite** (build + dev server)
@@ -176,14 +176,27 @@ keyboards.push({
 ## 📌 Future Improvements
 
 - Left-hand bass/chord keyboards
-- User accounts with saved preferences
+- Settings page
 - Full PWA support
-- Custom keyboard creator UI
-- Multiple notation modes (Do/Re/Mi or C/D/E)
 - Import/export of keyboard JSON layouts
 
 ---
 
 ## 📄 License
 
-*(To be completed by project owner)*
+Copyright (2025) Jérémie Fays. This project is released under the **AGPLv3+ license**.
+If you modify or build an application based on this code and distribute it — including by offering it as a web service — you must comply with all terms of the AGPLv3+ license.
+In particular, you are required to provide your users with access to the corresponding source code.
+
+
+## Contribute
+
+Whether you’re a user or a developer, contributions are welcome!
+
+* **For non-developers** (ideas, bug reports, keyboard layouts, documentation feedback):
+  👉 See the [`User Contribution Ideas`](./docs/user/getting-started.md#contribution-ideas-no-coding-required) 
+
+
+* **For developers** (code, features, fixes, workflow improvements):
+  👉 See the [`Developer Contribution Guide`](./docs/dev/contributing.md):
+

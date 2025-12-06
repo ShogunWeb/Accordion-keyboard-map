@@ -1,6 +1,7 @@
 # Accordion Keyboard Visualizer
 
-[![Documentation](https://img.shields.io/badge/Docs-GitHub%20Pages-blue)](https://shogunweb.github.io/Accordion-keyboard-map/)
+[![App](https://img.shields.io/badge/Docs-GitHub%20Pages-blue)](https://shogunweb.github.io/Accordion-keyboard-map/)
+[![Documentation](https://img.shields.io/badge/Docs-GitHub%20Pages-blue)](https://shogunweb.github.io/Accordion-keyboard-map/docs)
 
 
 A web application that visualizes the right-hand button layout of a diatonic or unisonoric accordion.

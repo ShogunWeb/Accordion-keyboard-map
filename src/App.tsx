@@ -31,6 +31,9 @@ const translations: Record<Language, Record<string, string>> = {
     notation: "Notation",
     notationAnglo: "English (A B C)",
     notationFrench: "French (Do Ré Mi)",
+    feedback: "Feedback",
+    feedbackPlaceholder: "Please send any feedback regarding the use of the app. Include your email if you want to be contacted for further discussions.",
+    feedbackSend: "Send feedback"
   },
   fr: {
     title: "Clavier d'accordéon",
@@ -51,6 +54,9 @@ const translations: Record<Language, Record<string, string>> = {
     notation: "Notation",
     notationAnglo: "Anglo-saxonne (A B C)",
     notationFrench: "Française (Do Ré Mi)",
+    feedback: "Retour",
+    feedbackPlaceholder: "Veuillez envoyer tout retour sur l'utilisation de l'application. Ajoutez votre email si vous souhaitez être recontacté.",
+    feedbackSend: "Envoyer"
   }
 };
 
@@ -85,6 +91,7 @@ export const App: React.FC = () => {
   const [notation, setNotation] = useState<NoteNotation>("anglo");
   const [showKeyboardName, setShowKeyboardName] = useState(false);
   const [showSelectors, setShowSelectors] = useState(false);
+  const [feedbackText, setFeedbackText] = useState("");
 
   const [fundamental, setFundamental] = useState("C");
   const [type, setType] = useState("maj");
@@ -211,6 +218,14 @@ export const App: React.FC = () => {
     }
   }, [selectedKeyboard.id, language, notation, fundamental, type, selectionMode]);
 
+  const submitFeedback = (e: React.FormEvent) => {
+    e.preventDefault();
+    const body = encodeURIComponent(feedbackText.trim());
+    const subject = encodeURIComponent("Accordion keyboard - user feedback");
+    const mailto = `mailto:accordion@shogunweb.be?subject=${subject}${body ? `&body=${body}` : ""}`;
+    window.location.href = mailto;
+  };
+
   return (
     <div className="app-shell">
       <header className="top-bar">
@@ -240,11 +255,11 @@ export const App: React.FC = () => {
       {(activeTab === "settings" || showSelectors) && (
         <section className="panel-card">
           {activeTab === "settings" ? (
-            <div className="selector-grid settings-grid">
-              <label className="field">
-                <span>{t.keyboard}</span>
-                <select
-                  value={selectedKeyboard.id}
+          <div className="selector-grid settings-grid">
+            <label className="field">
+              <span>{t.keyboard}</span>
+              <select
+                value={selectedKeyboard.id}
                   onChange={e => {
                     const kb = keyboards.find(k => k.id === e.target.value);
                     if (kb) setSelectedKeyboard(kb);
@@ -282,6 +297,18 @@ export const App: React.FC = () => {
                 </button>
               </div>
             </label>
+            <form className="field feedback" onSubmit={submitFeedback}>
+              <div className="feedback-header">
+                <span>{t.feedback}</span>
+                <button className="send-button" type="submit">{t.feedbackSend}</button>
+              </div>
+              <textarea
+                value={feedbackText}
+                onChange={e => setFeedbackText(e.target.value)}
+                placeholder={t.feedbackPlaceholder}
+                rows={4}
+              />
+            </form>
           </div>
         ) : (
             <div className="selector-grid selector-inline">

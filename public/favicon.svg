@@ -1,0 +1,22 @@
+<!-- public/favicon.svg -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Background (transparent or light) -->
+  <rect width="64" height="64" rx="14" ry="14" fill="#f5f5f5"></rect>
+
+  <!-- Outer button circle -->
+  <circle cx="32" cy="32" r="22" fill="#eeeeee" stroke="#333333" stroke-width="2"></circle>
+
+  <!-- Right half (PULL) -->
+  <path d="M32 10 A22 22 0 0 1 32 54 L32 32 Z" fill="#F5A623"></path>
+
+  <!-- Left half (PUSH) -->
+  <path d="M32 10 A22 22 0 0 0 32 54 L32 32 Z" fill="#4A90E2"></path>
+
+  <!-- Optional subtle inner circle for depth -->
+  <circle cx="32" cy="32" r="10" fill="#ffffff" opacity="0.7"></circle>
+
+  <!-- Very tiny label (will barely be visible at favicon size, optional) -->
+  <!-- You can remove these if they look noisy -->
+  <text x="26" y="34" font-size="6" text-anchor="middle" fill="#ffffff">P</text>
+  <text x="38" y="34" font-size="6" text-anchor="middle" fill="#ffffff">T</text>
+</svg>

@@ -1,0 +1,10 @@
+{
+  "entryPoints": ["src/App.tsx", "src/components/AccordionKeyboard.tsx", "src/data/keyboards.ts", "src/utils/noteUtils.ts"],
+  "out": "docs/API",
+  "plugin": [],
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "excludeExternals": true,
+  "includeVersion": false,
+  "tsconfig": "tsconfig.json"
+}

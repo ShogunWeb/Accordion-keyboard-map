@@ -14,6 +14,7 @@ It allows the user to:
 - Switch layouts dynamically
 - Use the app as a PWA (optional)
 
+![App Screenshot](./docs/Accordion-keyboard-map-screenshot.png)
 
 ---
 

@@ -37,7 +37,13 @@ export const AccordionKeyboard: React.FC<KeyboardProps> = ({
   const svgWidth = rows.length * buttonSpacingX + 100;
 
   return (
-    <svg width={svgWidth} height={svgHeight}>
+    <svg
+      width={svgWidth}
+      height={svgHeight}
+      viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+      preserveAspectRatio="xMidYMid meet"
+      style={{ maxWidth: "100%", height: "auto" }}
+    >
       {rows.map((row, rIdx) =>
         row.buttons.map((btn, bIdx) => {
           const x = svgWidth - (rIdx + 1) * buttonSpacingX;

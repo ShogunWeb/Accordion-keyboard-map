@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import "./App.css";
 import { AccordionKeyboard } from "./components/AccordionKeyboard";
 import { keyboards } from "./data/keyboards";
 import type { KeyboardDefinition } from "./data/keyboards";
@@ -7,11 +8,12 @@ import { formatNoteLabel, toPitchClass } from "./utils/noteUtils";
 import type { NoteNotation } from "./utils/noteUtils";
 
 type Language = "en" | "fr";
+const STORAGE_KEY = "akm-settings";
 
 /** Static UI translations keyed by language. */
 const translations: Record<Language, Record<string, string>> = {
   en: {
-    title: "Diatonic Keyboard",
+    title: "Accordion Keyboard Map",
     keyboard: "Keyboard",
     mode: "Mode",
     chord: "Chord",
@@ -22,6 +24,8 @@ const translations: Record<Language, Record<string, string>> = {
     legend: "Legend",
     legendUnselected: "Not selected",
     legendSelected: "Selected",
+    legendPush: "Push",
+    legendPull: "Pull",
     settings: "Settings",
     language: "Language",
     notation: "Notation",
@@ -29,7 +33,7 @@ const translations: Record<Language, Record<string, string>> = {
     notationFrench: "French (Do Ré Mi)",
   },
   fr: {
-    title: "Clavier Diatonique",
+    title: "Clavier d'accordéon",
     keyboard: "Clavier",
     mode: "Mode",
     chord: "Accord",
@@ -40,6 +44,8 @@ const translations: Record<Language, Record<string, string>> = {
     legend: "Légende",
     legendUnselected: "Non sélectionné",
     legendSelected: "Sélectionné",
+    legendPush: "Poussé",
+    legendPull: "Tiré",
     settings: "Paramètres",
     language: "Langue",
     notation: "Notation",
@@ -52,6 +58,18 @@ const translations: Record<Language, Record<string, string>> = {
 const chordTypes = ["maj","min","7","m7","maj7","dim","aug","sus2","sus4"];
 /** Scale types offered by the selector. */
 const scaleTypes = ["major","minor","harmonic minor","melodic minor","dorian","phrygian","lydian","mixolydian","locrian"];
+const scaleLabelsFr: Record<string, string> = {
+  "major": "majeure",
+  "minor": "mineure",
+  "harmonic minor": "mineure harmonique",
+  "melodic minor": "mineure mélodique",
+  "dorian": "dorien",
+  "phrygian": "phrygien",
+  "lydian": "lydien",
+  "mixolydian": "mixolydien",
+  "locrian": "locrien"
+};
+const rootNotes = ["C","C#","Db","D","D#","Eb","E","F","F#","Gb","G","G#","Ab","A","A#","Bb","B"];
 
 /**
  * Root UI for selecting an accordion layout and highlighting notes belonging
@@ -59,12 +77,15 @@ const scaleTypes = ["major","minor","harmonic minor","melodic minor","dorian","p
  */
 export const App: React.FC = () => {
   const [selectedKeyboard, setSelectedKeyboard] = useState<KeyboardDefinition>(keyboards[0]);
+  const [activeTab, setActiveTab] = useState<"chord" | "scale" | "settings">("chord");
+  const [selectionMode, setSelectionMode] = useState<"chord" | "scale">("chord");
   const [highlightNotes, setHighlightNotes] = useState<number[]>([]);
   const [highlightLabels, setHighlightLabels] = useState<Record<number, string>>({});
-  const [language, setLanguage] = useState<Language>("fr");
+  const [language, setLanguage] = useState<Language>("en");
   const [notation, setNotation] = useState<NoteNotation>("anglo");
+  const [showKeyboardName, setShowKeyboardName] = useState(false);
+  const [showSelectors, setShowSelectors] = useState(false);
 
-  const [mode, setMode] = useState<"chord" | "scale">("chord");
   const [fundamental, setFundamental] = useState("C");
   const [type, setType] = useState("maj");
 
@@ -76,7 +97,7 @@ export const App: React.FC = () => {
    */
   const applySelection = () => {
     let notes: string[] = [];
-    if (mode === "chord") {
+    if (selectionMode === "chord") {
       notes = Chord.get(`${fundamental}${type}`).notes;
     } else {
       notes = Scale.get(`${fundamental} ${type}`).notes;
@@ -97,150 +118,246 @@ export const App: React.FC = () => {
     setHighlightLabels(labels);
   };
 
+  const handleTabChange = (tab: "chord" | "scale" | "settings") => {
+    setActiveTab(tab);
+    if (tab !== "settings") {
+      setSelectionMode(tab);
+    }
+    setShowSelectors(false);
+  };
+
   // Keep a sensible default type when switching modes
   useEffect(() => {
-    if (mode === "chord") {
+    if (selectionMode === "chord") {
       setType("maj");
     } else {
       setType("major");
     }
-  }, [mode]);
+  }, [selectionMode]);
+
+  // Apply the current selection automatically when inputs change
+  useEffect(() => {
+    applySelection();
+  }, [fundamental, type, selectionMode]);
+
+  const selectionTypeLabel = selectionMode === "scale" && language === "fr"
+    ? scaleLabelsFr[type] ?? type
+    : type;
+  const selectionLabel = `${formatNoteLabel(fundamental, notation)} ${selectionTypeLabel}`;
+  const tabButtons: { id: "chord" | "scale" | "settings"; label: string }[] = [
+    { id: "chord", label: t.chord },
+    { id: "scale", label: t.scale },
+    { id: "settings", label: t.settings },
+  ];
+
+  // Keep keyboard name hidden on first render
+  useEffect(() => {
+    setShowKeyboardName(false);
+  }, []);
+
+  // Load saved preferences on first render
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as Partial<{
+          keyboardId: string;
+          language: Language;
+          notation: NoteNotation;
+          fundamental: string;
+          type: string;
+          selectionMode: "chord" | "scale";
+        }>;
+        if (parsed.language) setLanguage(parsed.language);
+        if (parsed.notation) setNotation(parsed.notation);
+        if (parsed.fundamental) setFundamental(parsed.fundamental);
+        if (parsed.type) setType(parsed.type);
+        if (parsed.selectionMode) {
+          setSelectionMode(parsed.selectionMode);
+          setActiveTab(parsed.selectionMode);
+        }
+        if (parsed.keyboardId) {
+          const kb = keyboards.find(k => k.id === parsed.keyboardId);
+          if (kb) setSelectedKeyboard(kb);
+        }
+        return;
+      }
+      // No saved language: infer from browser locale
+      const navLang = (navigator.language || navigator.languages?.[0] || "").toLowerCase();
+      if (navLang.startsWith("fr")) {
+        setLanguage("fr");
+      }
+    } catch {
+      // ignore malformed storage
+    }
+  }, []);
+
+  // Persist preferences whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          keyboardId: selectedKeyboard.id,
+          language,
+          notation,
+          fundamental,
+          type,
+          selectionMode
+        })
+      );
+    } catch {
+      // storage may be unavailable (private mode)
+    }
+  }, [selectedKeyboard.id, language, notation, fundamental, type, selectionMode]);
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h1>{t.title}</h1>
+    <div className="app-shell">
+      <header className="top-bar">
+        <div className="brand">
+          <div className="brand-mark">AK</div>
+          <div>
+            <p className="eyebrow">{t.keyboard}</p>
+            <h1 className="app-title">{t.title}</h1>
+          </div>
+        </div>
+      </header>
 
-      {/* Settings */}
-      <section style={{ marginBottom: "15px" }}>
-        <strong>{t.settings}</strong>
-        <div style={{ display: "flex", gap: "10px", marginTop: "6px", flexWrap: "wrap" }}>
-          <label>
-            {t.language} :{" "}
-            <select value={language} onChange={e => setLanguage(e.target.value as Language)}>
-              <option value="en">English</option>
-              <option value="fr">Français</option>
-            </select>
-          </label>
-          <label>
-            {t.notation} :{" "}
-            <select value={notation} onChange={e => setNotation(e.target.value as NoteNotation)}>
-              <option value="anglo">{t.notationAnglo}</option>
-              <option value="fr">{t.notationFrench}</option>
-            </select>
-          </label>
+      <nav className="tab-bar" role="tablist" aria-label="Modes">
+        {tabButtons.map(tab => (
+          <button
+            key={tab.id}
+            className={`tab-button ${activeTab === tab.id ? "active" : ""}`}
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            onClick={() => handleTabChange(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
+      {(activeTab === "settings" || showSelectors) && (
+        <section className="panel-card">
+          {activeTab === "settings" ? (
+            <div className="selector-grid settings-grid">
+              <label className="field">
+                <span>{t.keyboard}</span>
+                <select
+                  value={selectedKeyboard.id}
+                  onChange={e => {
+                    const kb = keyboards.find(k => k.id === e.target.value);
+                    if (kb) setSelectedKeyboard(kb);
+                    setShowKeyboardName(false);
+                  }}
+                >
+                  {keyboards.map(k => (
+                    <option key={k.id} value={k.id}>{k.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>{t.language}</span>
+                <select value={language} onChange={e => setLanguage(e.target.value as Language)}>
+                  <option value="en">English</option>
+                  <option value="fr">Français</option>
+                </select>
+              </label>
+            <label className="field">
+              <span>{t.notation}</span>
+              <div className="toggle">
+                <button
+                  type="button"
+                  className={`toggle-option ${notation === "anglo" ? "active" : ""}`}
+                  onClick={() => setNotation("anglo")}
+                >
+                  {t.notationAnglo}
+                </button>
+                <button
+                  type="button"
+                  className={`toggle-option ${notation === "fr" ? "active" : ""}`}
+                  onClick={() => setNotation("fr")}
+                >
+                  {t.notationFrench}
+                </button>
+              </div>
+            </label>
+          </div>
+        ) : (
+            <div className="selector-grid selector-inline">
+              <label className="field">
+                <span>{t.fundamental}</span>
+                <select value={fundamental} onChange={e => setFundamental(e.target.value)}>
+                  {rootNotes.map(n => (
+                    <option key={n} value={n}>{formatNoteLabel(n, notation)}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>{t.type}</span>
+                <select value={type} onChange={e => setType(e.target.value)}>
+                  {selectionMode === "chord"
+                    ? chordTypes.map(tVal => <option key={tVal} value={tVal}>{tVal}</option>)
+                    : scaleTypes.map(tVal => (
+                      <option key={tVal} value={tVal}>
+                        {language === "fr" ? scaleLabelsFr[tVal] ?? tVal : tVal}
+                      </option>
+                    ))
+                  }
+                </select>
+              </label>
+            </div>
+          )}
+        </section>
+      )}
+
+      <section className="panel-card keyboard-card">
+        <div className="keyboard-top">
+          <div className="keyboard-label">
+            <p className="eyebrow">{t.keyboard}</p>
+            <button
+              className="icon-button"
+              aria-expanded={showKeyboardName}
+              aria-label="Show keyboard name"
+              onClick={() => setShowKeyboardName(v => !v)}
+            >
+              ℹ︎
+            </button>
+          </div>
+          <button
+            className="pill pill-button"
+            type="button"
+            aria-expanded={showSelectors}
+            aria-label="Edit chord or scale selection"
+            onClick={() => setShowSelectors(v => !v)}
+          >
+            {selectionLabel}
+          </button>
+        </div>
+        {showKeyboardName && (
+          <div className="keyboard-name-chip" role="status">
+            {selectedKeyboard.name}
+          </div>
+        )}
+
+        <div className="keyboard-wrapper">
+          <AccordionKeyboard
+            rows={selectedKeyboard.rows}
+            highlightNotes={highlightNotes}
+            highlightLabels={highlightLabels}
+            notation={notation}
+          />
+        </div>
+
+        <div className="legend">
+          <span className="legend-text">{t.legendPush}</span>
+          <span className="split-circle" aria-hidden="true">
+            <span className="half left" />
+            <span className="half right" />
+          </span>
+          <span className="legend-text">{t.legendPull}</span>
         </div>
       </section>
-
-      {/* Sélecteur clavier */}
-      <label>
-        {t.keyboard} :{" "}
-        <select
-          value={selectedKeyboard.id}
-          onChange={e => {
-            const kb = keyboards.find(k => k.id === e.target.value);
-            if (kb) setSelectedKeyboard(kb);
-          }}
-        >
-          {keyboards.map(k => (
-            <option key={k.id} value={k.id}>{k.name}</option>
-          ))}
-        </select>
-      </label>
-
-      <hr style={{ margin: "10px 0" }} />
-
-      {/* Sélecteur fondamental et type */}
-      <label>
-        {t.mode} :{" "}
-        <select value={mode} onChange={e => setMode(e.target.value as "chord" | "scale")}>
-          <option value="chord">{t.chord}</option>
-          <option value="scale">{t.scale}</option>
-        </select>
-      </label>
-      <label style={{ marginLeft: "10px" }}>
-        {t.fundamental} :{" "}
-        <select value={fundamental} onChange={e => setFundamental(e.target.value)}>
-          {["C","C#","Db","D","D#","Eb","E","F","F#","Gb","G","G#","Ab","A","A#","Bb","B"].map(n => (
-            <option key={n} value={n}>{formatNoteLabel(n, notation)}</option>
-          ))}
-        </select>
-      </label>
-      <label style={{ marginLeft: "10px" }}>
-        {t.type} :{" "}
-        <select value={type} onChange={e => setType(e.target.value)}>
-          {mode === "chord"
-            ? chordTypes.map(tVal => <option key={tVal} value={tVal}>{tVal}</option>)
-            : scaleTypes.map(tVal => (
-              <option key={tVal} value={tVal}>
-                {language === "fr"
-                  ? ({
-                      "major": "majeure",
-                      "minor": "mineure",
-                      "harmonic minor": "mineure harmonique",
-                      "melodic minor": "mineure mélodique",
-                      "dorian": "dorien",
-                      "phrygian": "phrygien",
-                      "lydian": "lydien",
-                      "mixolydian": "mixolydien",
-                      "locrian": "locrien"
-                    } as Record<string, string>)[tVal] ?? tVal
-                  : tVal}
-              </option>
-            ))
-          }
-        </select>
-      </label>
-
-      <button style={{ marginLeft: "10px" }} onClick={applySelection}>{t.apply}</button>
-
-      <hr style={{ margin: "10px 0" }} />
-
-      {/* Rendu du clavier */}
-      <AccordionKeyboard
-        rows={selectedKeyboard.rows}
-        highlightNotes={highlightNotes}
-        highlightLabels={highlightLabels}
-        notation={notation}
-      />
-
-      {/* Légende graphique responsive */}
-      <div style={{ marginTop: "20px" }}>
-        <strong>{t.legend} :</strong>
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "20px",
-            marginTop: "10px",
-            justifyContent: "center",
-            alignItems: "center"
-          }}
-        >
-          {/* Bouton non sélectionné */}
-          <div style={{ textAlign: "center", width: "100px" }}>
-            <svg width="60" height="60">
-              <circle cx={30} cy={30} r={25} fill="#eee" stroke="#333" strokeWidth={2} />
-              <path d="M30 30 L30 5 A25 25 0 0 1 30 55 Z" fill="#ccc" />
-              <path d="M30 30 L30 55 A25 25 0 0 1 30 5 Z" fill="#fff" />
-              <text x={15} y={30} fontSize="7" textAnchor="middle" fill="#000" alignmentBaseline="middle">P</text>
-              <text x={45} y={30} fontSize="7" textAnchor="middle" fill="#000" alignmentBaseline="middle">T</text>
-            </svg>
-            <div style={{ fontSize: "12px" }}>{t.legendUnselected}</div>
-          </div>
-
-          {/* Bouton sélectionné */}
-          <div style={{ textAlign: "center", width: "100px" }}>
-            <svg width="60" height="60">
-              <circle cx={30} cy={30} r={25} fill="#eee" stroke="#333" strokeWidth={2} />
-              <path d="M30 30 L30 5 A25 25 0 0 1 30 55 Z" fill="#F5A623" />
-              <path d="M30 30 L30 55 A25 25 0 0 1 30 5 Z" fill="#4A90E2" />
-              <text x={15} y={30} fontSize="7" textAnchor="middle" fill="#000" alignmentBaseline="middle">P</text>
-              <text x={45} y={30} fontSize="7" textAnchor="middle" fill="#000" alignmentBaseline="middle">T</text>
-            </svg>
-            <div style={{ fontSize: "12px" }}>{t.legendSelected}</div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

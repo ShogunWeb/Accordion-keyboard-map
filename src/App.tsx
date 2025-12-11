@@ -92,8 +92,9 @@ export const App: React.FC = () => {
   const [highlightLabels, setHighlightLabels] = useState<Record<number, string>>({});
   const [language, setLanguage] = useState<Language>("en");
   const [notation, setNotation] = useState<NoteNotation>("anglo");
-  const zoomLevels = [1, 0.9, 0.8, 0.7, 0.6] as const;
-  const [zoomIndex, setZoomIndex] = useState(0);
+  const zoomLevels = [0.7, 0.8, 0.9, 1, 1.2] as const;
+  const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 520px)").matches;
+  const [zoomIndex, setZoomIndex] = useState(isMobile ? 1 : 3);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerView, setDrawerView] = useState<"selection" | "settings">("selection");
   const [feedbackText, setFeedbackText] = useState("");
@@ -150,8 +151,8 @@ export const App: React.FC = () => {
     : type;
   const selectionLabel = `${formatNoteLabel(fundamental, notation)} ${selectionTypeLabel}`;
 
-  const zoomIn = () => setZoomIndex(i => Math.max(0, i - 1));
-  const zoomOut = () => setZoomIndex(i => Math.min(zoomLevels.length - 1, i + 1));
+  const zoomIn = () => setZoomIndex(i => Math.min(zoomLevels.length - 1, i + 1));
+  const zoomOut = () => setZoomIndex(i => Math.max(0, i - 1));
   const openDrawer = (view: "selection" | "settings") => {
     setDrawerView(view);
     setDrawerOpen(true);
@@ -263,7 +264,7 @@ export const App: React.FC = () => {
                 className="zoom-button"
                 type="button"
                 onClick={zoomIn}
-                disabled={zoomIndex === 0}
+                disabled={zoomIndex === zoomLevels.length - 1}
                 aria-label="Increase keyboard size"
               >
                 +
@@ -272,7 +273,7 @@ export const App: React.FC = () => {
                 className="zoom-button"
                 type="button"
                 onClick={zoomOut}
-                disabled={zoomIndex === zoomLevels.length - 1}
+                disabled={zoomIndex === 0}
                 aria-label="Decrease keyboard size"
               >
                 −

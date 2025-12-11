@@ -324,12 +324,6 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: #f3f4f6;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  padding: 4px 8px;
-  color: #111827;
-  font-weight: 700;
 }
 
 .zoom-button {

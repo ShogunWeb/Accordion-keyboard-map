@@ -30,8 +30,8 @@ const translations: Record<Language, Record<string, string>> = {
     settings: "Settings",
     language: "Language",
     notation: "Notation",
-    notationAnglo: "A B C",
-    notationFrench: "Do Ré Mi",
+    notationAnglo: "C, D, E",
+    notationFrench: "Do, Ré, Mi",
     feedback: "Feedback",
     feedbackPlaceholder: "Please send any feedback regarding the use of the app.",
     feedbackSend: "Send feedback"
@@ -53,8 +53,8 @@ const translations: Record<Language, Record<string, string>> = {
     settings: "Paramètres",
     language: "Langue",
     notation: "Notation",
-    notationAnglo: "A B C",
-    notationFrench: "Do Ré Mi",
+    notationAnglo: "C, D, E",
+    notationFrench: "Do, Ré, Mi",
     feedback: "Retour",
     feedbackPlaceholder: "Veuillez envoyer tout retour sur l'utilisation de l'application.",
     feedbackSend: "Envoyer"
@@ -161,6 +161,11 @@ export const App: React.FC = () => {
 
   const zoomIn = () => setZoomIndex(i => Math.max(0, i - 1));
   const zoomOut = () => setZoomIndex(i => Math.min(zoomLevels.length - 1, i + 1));
+
+  // Keep document title in sync with language/app title
+  useEffect(() => {
+    document.title = t.title;
+  }, [t.title]);
 
   // Load saved preferences on first render
   useEffect(() => {

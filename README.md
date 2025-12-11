@@ -192,9 +192,6 @@ Keyboard layouts live in **separate files** under `src/data/keyboards/` and are 
 
 ## 📌 Future Improvements
 
-- Left-hand bass/chord keyboards
-- Settings page
-- Full PWA support
 - Import/export of keyboard JSON layouts
 
 ---

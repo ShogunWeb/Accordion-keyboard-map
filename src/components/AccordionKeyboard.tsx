@@ -13,6 +13,8 @@ export interface KeyboardProps {
   highlightLabels?: Record<number, string>;
   /** Desired note notation for display. */
   notation?: "anglo" | "fr";
+  /** Visual scale multiplier for the keyboard layout. */
+  scale?: number;
 }
 
 /**
@@ -24,16 +26,23 @@ export const AccordionKeyboard: React.FC<KeyboardProps> = ({
   rows,
   highlightNotes = [],
   highlightLabels = {},
-  notation = "anglo"
+  notation = "anglo",
+  scale = 1
 }) => {
-  const buttonSize = 50;
-  const buttonSpacingY = buttonSize + 10;
-  const buttonSpacingX = 60;
-  const paddingBottom = 40;
-  const paddingTop = 0;
+  const buttonSize = 50 * scale;
+  const buttonRadius = buttonSize / 2;
+  const buttonSpacingY = buttonSize + 10 * scale;
+  const buttonSpacingX = 65 * scale;
+  const verticalPadding = 12 * scale;
 
-  const maxButtons = Math.max(...rows.map(r => r.buttons.length));
-  const svgHeight = paddingBottom + maxButtons * buttonSpacingY + paddingTop;
+  const positions = rows.flatMap(row =>
+    row.buttons.map((_, bIdx) => bIdx * buttonSpacingY + (row.offsetY * buttonSize) / 2)
+  );
+  const minPos = positions.length ? Math.min(...positions) : 0;
+  const maxPos = positions.length ? Math.max(...positions) : 0;
+  const contentHeight = maxPos - minPos + buttonSize;
+
+  const svgHeight = contentHeight + verticalPadding * 2;
   const svgWidth = rows.length * buttonSpacingX + 100;
 
   return (
@@ -48,11 +57,8 @@ export const AccordionKeyboard: React.FC<KeyboardProps> = ({
         row.buttons.map((btn, bIdx) => {
           const x = svgWidth - (rIdx + 1) * buttonSpacingX;
 
-          const y = svgHeight - (
-            paddingBottom +
-            bIdx * buttonSpacingY +
-            (row.offsetY * buttonSize) / 2
-          );
+          const position = bIdx * buttonSpacingY + (row.offsetY * buttonSize) / 2;
+          const y = verticalPadding + (maxPos - position) + buttonRadius;
 
           // Determine whether either half of the button should be highlighted
           const pushNote = btn.push.replace(/[0-9]/g, '');
@@ -69,24 +75,24 @@ export const AccordionKeyboard: React.FC<KeyboardProps> = ({
           return (
             <g key={`${rIdx}-${bIdx}`} transform={`translate(${x},${y})`}>
               {/* cercle */}
-              <circle cx={0} cy={0} r={buttonSize / 2} fill="#eee" stroke="#333" strokeWidth={2} />
+              <circle cx={0} cy={0} r={buttonRadius} fill="#eee" stroke="#333" strokeWidth={2} />
 
               {/* demi-disques */}
               <path
-                d={`M0 0 L0 -${buttonSize/2} A${buttonSize/2} ${buttonSize/2} 0 0 1 0 ${buttonSize/2} Z`}
+                d={`M0 0 L0 -${buttonRadius} A${buttonRadius} ${buttonRadius} 0 0 1 0 ${buttonRadius} Z`}
                 fill={pullHighlighted ? "#F5A623" : "#ccc"} // tiré
               />
               <path
-                d={`M0 0 L0 ${buttonSize/2} A${buttonSize/2} ${buttonSize/2} 0 0 1 0 -${buttonSize/2} Z`}
+                d={`M0 0 L0 ${buttonRadius} A${buttonRadius} ${buttonRadius} 0 0 1 0 -${buttonRadius} Z`}
                 fill={pushHighlighted ? "#4A90E2" : "#fff"} // poussé
               />
 
               {/* notes dans les demi-disques */}
-              <text x={-buttonSize/4} y={0} fontSize="10" textAnchor="middle" fill="#000">{pushLabel}</text>
-              <text x={buttonSize/4} y={0} fontSize="10" textAnchor="middle" fill="#000">{pullLabel}</text>
+              <text x={-buttonSize/4} y={0} fontSize={10 * scale} textAnchor="middle" fill="#000">{pushLabel}</text>
+              <text x={buttonSize/4} y={0} fontSize={10 * scale} textAnchor="middle" fill="#000">{pullLabel}</text>
 
               {/* numéro du bouton juste à droite */}
-              <text x={buttonSize/2 + 2} y={0} fontSize="12" textAnchor="start" fill="#000">{btn.index}</text>
+              <text x={buttonSize/2 + 2} y={0} fontSize={12 * scale} textAnchor="start" fill="#000">{btn.index}</text>
             </g>
           );
         })

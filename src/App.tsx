@@ -3,6 +3,7 @@ import "./App.css";
 import { AccordionKeyboard } from "./components/AccordionKeyboard";
 import { keyboards } from "./data/keyboards";
 import type { KeyboardDefinition } from "./data/keyboards";
+import favicon from "/favicon.svg";
 import { Chord, Scale } from "tonal";
 import { formatNoteLabel, toPitchClass } from "./utils/noteUtils";
 import type { NoteNotation } from "./utils/noteUtils";
@@ -29,10 +30,10 @@ const translations: Record<Language, Record<string, string>> = {
     settings: "Settings",
     language: "Language",
     notation: "Notation",
-    notationAnglo: "English (A B C)",
-    notationFrench: "French (Do Ré Mi)",
+    notationAnglo: "A B C",
+    notationFrench: "Do Ré Mi",
     feedback: "Feedback",
-    feedbackPlaceholder: "Please send any feedback regarding the use of the app. Include your email if you want to be contacted for further discussions.",
+    feedbackPlaceholder: "Please send any feedback regarding the use of the app.",
     feedbackSend: "Send feedback"
   },
   fr: {
@@ -52,10 +53,10 @@ const translations: Record<Language, Record<string, string>> = {
     settings: "Paramètres",
     language: "Langue",
     notation: "Notation",
-    notationAnglo: "Anglo-saxonne (A B C)",
-    notationFrench: "Française (Do Ré Mi)",
+    notationAnglo: "A B C",
+    notationFrench: "Do Ré Mi",
     feedback: "Retour",
-    feedbackPlaceholder: "Veuillez envoyer tout retour sur l'utilisation de l'application. Ajoutez votre email si vous souhaitez être recontacté.",
+    feedbackPlaceholder: "Veuillez envoyer tout retour sur l'utilisation de l'application.",
     feedbackSend: "Envoyer"
   }
 };
@@ -89,9 +90,10 @@ export const App: React.FC = () => {
   const [highlightLabels, setHighlightLabels] = useState<Record<number, string>>({});
   const [language, setLanguage] = useState<Language>("en");
   const [notation, setNotation] = useState<NoteNotation>("anglo");
-  const [showKeyboardName, setShowKeyboardName] = useState(false);
   const [showSelectors, setShowSelectors] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
+  const zoomLevels = [1, 0.9, 0.8] as const;
+  const [zoomIndex, setZoomIndex] = useState(0);
 
   const [fundamental, setFundamental] = useState("C");
   const [type, setType] = useState("maj");
@@ -157,10 +159,8 @@ export const App: React.FC = () => {
     { id: "settings", label: t.settings },
   ];
 
-  // Keep keyboard name hidden on first render
-  useEffect(() => {
-    setShowKeyboardName(false);
-  }, []);
+  const zoomIn = () => setZoomIndex(i => Math.max(0, i - 1));
+  const zoomOut = () => setZoomIndex(i => Math.min(zoomLevels.length - 1, i + 1));
 
   // Load saved preferences on first render
   useEffect(() => {
@@ -230,11 +230,8 @@ export const App: React.FC = () => {
     <div className="app-shell">
       <header className="top-bar">
         <div className="brand">
-          <div className="brand-mark">AK</div>
-          <div>
-            <p className="eyebrow">{t.keyboard}</p>
-            <h1 className="app-title">{t.title}</h1>
-          </div>
+          <img className="brand-mark" src={favicon} alt="Accordion keyboard icon" />
+          <h1 className="app-title">{t.title}</h1>
         </div>
       </header>
 
@@ -263,7 +260,6 @@ export const App: React.FC = () => {
                   onChange={e => {
                     const kb = keyboards.find(k => k.id === e.target.value);
                     if (kb) setSelectedKeyboard(kb);
-                    setShowKeyboardName(false);
                   }}
                 >
                   {keyboards.map(k => (
@@ -340,32 +336,39 @@ export const App: React.FC = () => {
 
       <section className="panel-card keyboard-card">
         <div className="keyboard-top">
-          <div className="keyboard-label">
-            <p className="eyebrow">{t.keyboard}</p>
+          <p className="eyebrow">{selectedKeyboard.name}</p>
+          <div className="keyboard-actions">
+            <div className="zoom-controls" aria-label="Resize keyboard">
+              <button
+                className="zoom-button"
+                type="button"
+                onClick={zoomIn}
+                disabled={zoomIndex === 0}
+                aria-label="Increase keyboard size"
+              >
+                +
+              </button>
+              <button
+                className="zoom-button"
+                type="button"
+                onClick={zoomOut}
+                disabled={zoomIndex === zoomLevels.length - 1}
+                aria-label="Decrease keyboard size"
+              >
+                −
+              </button>
+            </div>
             <button
-              className="icon-button"
-              aria-expanded={showKeyboardName}
-              aria-label="Show keyboard name"
-              onClick={() => setShowKeyboardName(v => !v)}
+              className="pill pill-button"
+              type="button"
+              aria-expanded={showSelectors}
+              aria-label="Edit chord or scale selection"
+              onClick={() => setShowSelectors(v => !v)}
             >
-              ℹ︎
+              {selectionLabel}
             </button>
           </div>
-          <button
-            className="pill pill-button"
-            type="button"
-            aria-expanded={showSelectors}
-            aria-label="Edit chord or scale selection"
-            onClick={() => setShowSelectors(v => !v)}
-          >
-            {selectionLabel}
-          </button>
         </div>
-        {showKeyboardName && (
-          <div className="keyboard-name-chip" role="status">
-            {selectedKeyboard.name}
-          </div>
-        )}
 
         <div className="keyboard-wrapper">
           <AccordionKeyboard
@@ -373,6 +376,7 @@ export const App: React.FC = () => {
             highlightNotes={highlightNotes}
             highlightLabels={highlightLabels}
             notation={notation}
+            scale={zoomLevels[zoomIndex]}
           />
         </div>
 

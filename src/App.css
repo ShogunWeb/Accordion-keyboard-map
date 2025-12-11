@@ -46,32 +46,6 @@
   color: #6b7280;
 }
 
-.tab-bar {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  background: #e5e7eb;
-  border-radius: 12px;
-  padding: 4px;
-}
-
-.tab-button {
-  border: none;
-  border-radius: 10px;
-  padding: 10px 6px;
-  font-size: 1rem;
-  font-weight: 700;
-  background: transparent;
-  color: #4b5563;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.tab-button.active {
-  background: white;
-  color: #0f172a;
-  box-shadow: 0 6px 12px rgba(15, 23, 42, 0.06);
-}
-
 .panel-card {
   background: white;
   border: 1px solid #e5e7eb;
@@ -86,21 +60,6 @@
   border: none;
   box-shadow: none;
   border-radius: 0;
-}
-
-.panel-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-}
-
-.panel-title {
-  margin: 4px 0 0;
-  font-size: 1.15rem;
-  font-weight: 800;
 }
 
 .pill {
@@ -483,20 +442,6 @@
     justify-content: flex-start;
     margin-left: 70px;
   }
-}
-
-.keyboard-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-
-.keyboard-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
 }
 
 .zoom-controls {

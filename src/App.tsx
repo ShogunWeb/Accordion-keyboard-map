@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "./App.css";
 import { AccordionKeyboard } from "./components/AccordionKeyboard";
-import { keyboards } from "./data/keyboards";
-import type { KeyboardDefinition } from "./data/keyboards";
+import { keyboards } from "./data";
+import type { KeyboardDefinition } from "./data";
 import favicon from "/favicon.svg";
 import { Chord, Scale } from "tonal";
 import { formatNoteLabel, toPitchClass } from "./utils/noteUtils";

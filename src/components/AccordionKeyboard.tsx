@@ -1,5 +1,5 @@
 import React from "react";
-import type { KeyboardRow } from "../data/keyboards";
+import type { KeyboardRow } from "../data";
 import { formatNoteLabel, toPitchClass } from "../utils/noteUtils";
 
 /**

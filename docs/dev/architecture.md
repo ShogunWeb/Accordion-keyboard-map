@@ -50,24 +50,38 @@ This component does **no music theory** — it only draws what it’s given.
 
 ## Data Layer
 
-### `src/data/keyboards.ts`
+### Keyboard data files
 
-Contains an array of keyboard layouts:
+- `src/data/types.ts` — shared interfaces (`KeyboardDefinition`, `KeyboardRow`, `ButtonLayout`)
+- `src/data/index.ts` — glob‑loads all `*.keyboard.ts` files in `src/data/keyboards/`, exports the `keyboards` array (sorted by `name`)
+- `src/data/keyboards/*.keyboard.ts` — one file per layout, default‑exporting a `KeyboardDefinition`
 
-- `id`: string identifier
-- `name`: user‑facing label
-- `rows`: description of each row (offset + buttons)
+Example keyboard file:
 
-Each row includes:
+```ts
+import type { KeyboardDefinition } from "../types";
 
-- `offsetY`: number of half‑button vertical offsets
-- `buttons`: buttons from bottom to top
+const keyboard: KeyboardDefinition = {
+  id: "my-layout",
+  name: "My Layout",
+  rows: [
+    {
+      offsetY: 0, // in half-button units
+      buttons: [
+        { index: 1, push: "C4", pull: "D4" },
+        { index: 2, push: "E4", pull: "F4" },
+      ]
+    }
+  ]
+};
 
-Each button includes:
+export default keyboard;
+```
 
-- `index`: button index from the bottom (1‑based)
-- `push`: note played on push (string)
-- `pull`: note played on pull (string)
+Notes:
+- File names should end with `.keyboard.ts`
+- `id` must be unique; `name` is what users see in the selector
+- Rows are ordered right → left; buttons bottom → top; `offsetY` is expressed in half-button units
 
 ---
 

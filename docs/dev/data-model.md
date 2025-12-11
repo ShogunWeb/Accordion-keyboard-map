@@ -4,17 +4,27 @@ This document describes the internal data structures used to represent accordion
 
 ---
 
-## Keyboard
+## File Layout (data layer)
+
+- `src/data/types.ts` — shared TypeScript interfaces
+- `src/data/index.ts` — collects all keyboard definitions via `import.meta.glob`, exports `keyboards`
+- `src/data/keyboards/*.keyboard.ts` — one file per layout, default‑exporting a `KeyboardDefinition`
+
+Adding a keyboard = adding a new `*.keyboard.ts` file; the loader picks it up automatically (sorted by `name`).
+
+---
+
+## Keyboard type
 
 ```ts
-type Keyboard = {
+type KeyboardDefinition = {
   id: string;
   name: string;
   rows: Row[];
 };
 ```
 
-- `id` — unique technical identifier  
+- `id` — unique technical identifier (used for storage/selection)  
 - `name` — user‑visible label  
 - `rows` — rows ordered **right → left**
 
@@ -98,10 +108,14 @@ This function should be used both for:
 
 ---
 
-## Example Keyboard Object
+## Example keyboard definition file
+
+`src/data/keyboards/my-layout.keyboard.ts`
 
 ```ts
-const exampleKeyboard = {
+import type { KeyboardDefinition } from "../types";
+
+const keyboard: KeyboardDefinition = {
   id: "example",
   name: "Example Layout",
   rows: [
@@ -121,6 +135,8 @@ const exampleKeyboard = {
     }
   ]
 };
+
+export default keyboard;
 ```
 
-This model is intentionally simple and can be extended with additional metadata if needed (MIDI numbers, fingering suggestions, tags, etc.).
+The schema is intentionally simple and can be extended with additional metadata if needed (MIDI numbers, fingering suggestions, tags, etc.).

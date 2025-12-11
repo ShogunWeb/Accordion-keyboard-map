@@ -46,6 +46,10 @@ Accordeon-keyboard/
 ├─ tailwind.config.js
 ├─ vite.config.ts
 ├─ package.json
+│  ├─ data/
+│  │  ├─ index.ts            # Loads all keyboard definition files
+│  │  ├─ types.ts            # Shared data types
+│  │  └─ keyboards/          # One file per keyboard layout (*.keyboard.ts)
 └─ README.md
 ```
 
@@ -154,23 +158,35 @@ npm run preview
 
 ## ➕ Adding a New Keyboard Layout
 
-Edit `src/data/keyboards.ts`:
+Keyboard layouts live in **separate files** under `src/data/keyboards/` and are auto-loaded by `src/data/index.ts` using `import.meta.glob`. To add one:
 
-```ts
-keyboards.push({
-  id: "my-custom-layout",
-  name: "My Layout",
-  rows: [
-    {
-      offsetY: 0,
-      buttons: [
-        { index: 1, push: "C4", pull: "D4" },
-        { index: 2, push: "E4", pull: "F4" },
-      ]
-    }
-  ]
-});
-```
+1. **Create a file** `src/data/keyboards/my-layout.keyboard.ts`
+2. **Import the type** and export a default object:
+   ```ts
+   import type { KeyboardDefinition } from "../types";
+
+   const keyboard: KeyboardDefinition = {
+     id: "my-custom-layout",
+     name: "My Layout (G/C)",
+     rows: [
+       {
+         offsetY: 0, // half-button units; 0 = aligned, 1 = shifted by half a button
+         buttons: [
+           { index: 1, push: "C4", pull: "D4" },
+           { index: 2, push: "E4", pull: "F4" },
+         ]
+       },
+       // add more rows as needed...
+     ]
+   };
+
+   export default keyboard;
+   ```
+3. **Naming conventions**
+   - File name: `something.keyboard.ts`
+   - `id`: unique string (used for selection/storage)
+   - `name`: display label shown in the UI
+4. Restart the dev server if needed; the app will pick up the new file automatically and list it in the Keyboard selector (sorted alphabetically by `name`).
 
 ---
 
@@ -200,4 +216,3 @@ Whether you’re a user or a developer, contributions are welcome!
 
 * **For developers** (code, features, fixes, workflow improvements):
   👉 See the [`Developer Contribution Guide`](./docs/dev/contributing.md):
-

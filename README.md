@@ -14,7 +14,9 @@ It allows the user to:
 - Switch layouts dynamically
 - Use the app as a PWA (optional)
 
-![App Screenshot](./docs/Accordion-keyboard-map-screenshot.png)
+<p align="center">
+  <img src="./docs/Accordion-keyboard-map-screenshot.png" alt="App screenshot" height="600"/>
+</p>
 
 ---
 

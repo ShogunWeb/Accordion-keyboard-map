@@ -378,6 +378,33 @@
   width: 100%;
 }
 
+.checkbox-field {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.source-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  padding: 8px 10px;
+  text-decoration: none;
+  color: #0f172a;
+  font-weight: 700;
+  transition: color 0.12s ease;
+}
+
+.source-link:hover {
+  color: #0ea5e9;
+}
+
+.github-mark {
+  width: 18px;
+  height: 18px;
+}
+
 .settings-fab {
   position: absolute;
   bottom: 10px;
@@ -445,6 +472,16 @@
     border: none;
     border-radius: 0;
     background: none;
+  }
+
+  .keyboard-wrapper svg {
+    margin-left: 20px;
+    margin-right: auto;
+  }
+
+  .legend {
+    justify-content: flex-start;
+    margin-left: 70px;
   }
 }
 

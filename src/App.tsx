@@ -34,7 +34,8 @@ const translations: Record<Language, Record<string, string>> = {
     notationFrench: "Do, Ré, Mi",
     feedback: "Feedback",
     feedbackPlaceholder: "Please send any feedback regarding the use of the app.",
-    feedbackSend: "Send feedback"
+    feedbackSend: "Send feedback",
+    showLegend: "Show legend"
   },
   fr: {
     title: "Clavier d'accordéon",
@@ -57,7 +58,8 @@ const translations: Record<Language, Record<string, string>> = {
     notationFrench: "Do, Ré, Mi",
     feedback: "Retour",
     feedbackPlaceholder: "Veuillez envoyer tout retour sur l'utilisation de l'application.",
-    feedbackSend: "Envoyer"
+    feedbackSend: "Envoyer",
+    showLegend: "Afficher la légende"
   }
 };
 
@@ -95,6 +97,7 @@ export const App: React.FC = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerView, setDrawerView] = useState<"selection" | "settings">("selection");
   const [feedbackText, setFeedbackText] = useState("");
+  const [showLegend, setShowLegend] = useState(true);
 
   const [fundamental, setFundamental] = useState("C");
   const [type, setType] = useState("maj");
@@ -173,6 +176,7 @@ export const App: React.FC = () => {
           type: string;
           selectionMode: "chord" | "scale";
           zoomIndex: number;
+          showLegend: boolean;
         }>;
         if (parsed.language) setLanguage(parsed.language);
         if (parsed.notation) setNotation(parsed.notation);
@@ -188,6 +192,9 @@ export const App: React.FC = () => {
         if (parsed.keyboardId) {
           const kb = keyboards.find(k => k.id === parsed.keyboardId);
           if (kb) setSelectedKeyboard(kb);
+        }
+        if (typeof parsed.showLegend === "boolean") {
+          setShowLegend(parsed.showLegend);
         }
         return;
       }
@@ -213,13 +220,14 @@ export const App: React.FC = () => {
           fundamental,
           type,
           selectionMode,
-          zoomIndex
+          zoomIndex,
+          showLegend
         })
       );
     } catch {
       // storage may be unavailable (private mode)
     }
-  }, [selectedKeyboard.id, language, notation, fundamental, type, selectionMode, zoomIndex]);
+  }, [selectedKeyboard.id, language, notation, fundamental, type, selectionMode, zoomIndex, showLegend]);
 
   const submitFeedback = (e: React.FormEvent) => {
     e.preventDefault();
@@ -294,14 +302,16 @@ export const App: React.FC = () => {
             notation={notation}
             scale={zoomLevels[zoomIndex]}
           />
-          <div className="legend legend-inline">
-            <span className="legend-text">{t.legendPush}</span>
-            <span className="split-circle" aria-hidden="true">
-              <span className="half left" />
-              <span className="half right" />
-            </span>
-            <span className="legend-text">{t.legendPull}</span>
-          </div>
+          {showLegend && (
+            <div className="legend legend-inline">
+              <span className="legend-text">{t.legendPush}</span>
+              <span className="split-circle" aria-hidden="true">
+                <span className="half left" />
+                <span className="half right" />
+              </span>
+              <span className="legend-text">{t.legendPull}</span>
+            </div>
+          )}
           <button
             className="settings-fab"
             type="button"
@@ -386,6 +396,14 @@ export const App: React.FC = () => {
                   </button>
                 </div>
               </label>
+              <label className="field checkbox-field">
+                <span>{t.showLegend}</span>
+                <input
+                  type="checkbox"
+                  checked={showLegend}
+                  onChange={e => setShowLegend(e.target.checked)}
+                />
+              </label>
               <form className="field feedback" onSubmit={submitFeedback}>
                 <div className="feedback-header">
                   <span>{t.feedback}</span>
@@ -398,6 +416,20 @@ export const App: React.FC = () => {
                   rows={4}
                 />
               </form>
+              <a
+                className="source-link"
+                href="https://github.com/ShogunWeb/Accordion-keyboard-map"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <svg className="github-mark" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+                  <path
+                    fill="currentColor"
+                    d="M12 2a10 10 0 0 0-3.162 19.492c.5.092.683-.217.683-.483 0-.238-.01-1.024-.014-1.858-2.782.604-3.37-1.19-3.37-1.19-.455-1.156-1.11-1.465-1.11-1.465-.908-.62.069-.608.069-.608 1.004.07 1.532 1.03 1.532 1.03.893 1.53 2.341 1.087 2.91.831.09-.647.35-1.088.636-1.339-2.22-.253-4.556-1.11-4.556-4.944 0-1.092.39-1.987 1.03-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.269 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.56 9.56 0 0 1 2.5.336c1.909-1.295 2.748-1.026 2.748-1.026.546 1.378.202 2.397.1 2.65.64.701 1.028 1.596 1.028 2.688 0 3.844-2.34 4.688-4.57 4.936.36.31.68.923.68 1.86 0 1.344-.012 2.428-.012 2.758 0 .268.18.58.688.48A10 10 0 0 0 12 2Z"
+                  />
+                </svg>
+                <span>Source code</span>
+              </a>
             </div>
           )}
         </div>

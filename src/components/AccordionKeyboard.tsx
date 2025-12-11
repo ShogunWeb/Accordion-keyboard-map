@@ -34,6 +34,7 @@ export const AccordionKeyboard: React.FC<KeyboardProps> = ({
   const buttonSpacingY = buttonSize + 10 * scale;
   const buttonSpacingX = 65 * scale;
   const verticalPadding = 12 * scale;
+  const horizontalPadding = 20 * scale;
 
   const positions = rows.flatMap(row =>
     row.buttons.map((_, bIdx) => bIdx * buttonSpacingY + (row.offsetY * buttonSize) / 2)
@@ -43,7 +44,7 @@ export const AccordionKeyboard: React.FC<KeyboardProps> = ({
   const contentHeight = maxPos - minPos + buttonSize;
 
   const svgHeight = contentHeight + verticalPadding * 2;
-  const svgWidth = rows.length * buttonSpacingX + 100;
+  const svgWidth = rows.length * buttonSpacingX + horizontalPadding * 2;
 
   return (
     <svg
@@ -55,7 +56,9 @@ export const AccordionKeyboard: React.FC<KeyboardProps> = ({
     >
       {rows.map((row, rIdx) =>
         row.buttons.map((btn, bIdx) => {
-          const x = svgWidth - (rIdx + 1) * buttonSpacingX;
+          const x = horizontalPadding +
+            (rows.length - rIdx - 1) * buttonSpacingX +
+            buttonSpacingX / 2;
 
           const position = bIdx * buttonSpacingY + (row.offsetY * buttonSize) / 2;
           const y = verticalPadding + (maxPos - position) + buttonRadius;

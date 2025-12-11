@@ -83,17 +83,18 @@ const rootNotes = ["C","C#","Db","D","D#","Eb","E","F","F#","Gb","G","G#","Ab","
  * to the chosen chord or scale.
  */
 export const App: React.FC = () => {
-  const [selectedKeyboard, setSelectedKeyboard] = useState<KeyboardDefinition>(keyboards[0]);
-  const [activeTab, setActiveTab] = useState<"chord" | "scale" | "settings">("chord");
+  const defaultKeyboard = keyboards.find(k => k.id === "image-3rangs") ?? keyboards[0];
+  const [selectedKeyboard, setSelectedKeyboard] = useState<KeyboardDefinition>(defaultKeyboard);
   const [selectionMode, setSelectionMode] = useState<"chord" | "scale">("chord");
   const [highlightNotes, setHighlightNotes] = useState<number[]>([]);
   const [highlightLabels, setHighlightLabels] = useState<Record<number, string>>({});
   const [language, setLanguage] = useState<Language>("en");
   const [notation, setNotation] = useState<NoteNotation>("anglo");
-  const [showSelectors, setShowSelectors] = useState(false);
-  const [feedbackText, setFeedbackText] = useState("");
-  const zoomLevels = [1, 0.9, 0.8] as const;
+  const zoomLevels = [1, 0.9, 0.8, 0.7, 0.6] as const;
   const [zoomIndex, setZoomIndex] = useState(0);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerView, setDrawerView] = useState<"selection" | "settings">("selection");
+  const [feedbackText, setFeedbackText] = useState("");
 
   const [fundamental, setFundamental] = useState("C");
   const [type, setType] = useState("maj");
@@ -127,14 +128,6 @@ export const App: React.FC = () => {
     setHighlightLabels(labels);
   };
 
-  const handleTabChange = (tab: "chord" | "scale" | "settings") => {
-    setActiveTab(tab);
-    if (tab !== "settings") {
-      setSelectionMode(tab);
-    }
-    setShowSelectors(false);
-  };
-
   // Keep a sensible default type when switching modes
   useEffect(() => {
     if (selectionMode === "chord") {
@@ -153,14 +146,14 @@ export const App: React.FC = () => {
     ? scaleLabelsFr[type] ?? type
     : type;
   const selectionLabel = `${formatNoteLabel(fundamental, notation)} ${selectionTypeLabel}`;
-  const tabButtons: { id: "chord" | "scale" | "settings"; label: string }[] = [
-    { id: "chord", label: t.chord },
-    { id: "scale", label: t.scale },
-    { id: "settings", label: t.settings },
-  ];
 
   const zoomIn = () => setZoomIndex(i => Math.max(0, i - 1));
   const zoomOut = () => setZoomIndex(i => Math.min(zoomLevels.length - 1, i + 1));
+  const openDrawer = (view: "selection" | "settings") => {
+    setDrawerView(view);
+    setDrawerOpen(true);
+  };
+  const closeDrawer = () => setDrawerOpen(false);
 
   // Keep document title in sync with language/app title
   useEffect(() => {
@@ -179,6 +172,7 @@ export const App: React.FC = () => {
           fundamental: string;
           type: string;
           selectionMode: "chord" | "scale";
+          zoomIndex: number;
         }>;
         if (parsed.language) setLanguage(parsed.language);
         if (parsed.notation) setNotation(parsed.notation);
@@ -186,7 +180,10 @@ export const App: React.FC = () => {
         if (parsed.type) setType(parsed.type);
         if (parsed.selectionMode) {
           setSelectionMode(parsed.selectionMode);
-          setActiveTab(parsed.selectionMode);
+        }
+        if (typeof parsed.zoomIndex === "number") {
+          const clamped = Math.min(Math.max(0, parsed.zoomIndex), zoomLevels.length - 1);
+          setZoomIndex(clamped);
         }
         if (parsed.keyboardId) {
           const kb = keyboards.find(k => k.id === parsed.keyboardId);
@@ -215,13 +212,14 @@ export const App: React.FC = () => {
           notation,
           fundamental,
           type,
-          selectionMode
+          selectionMode,
+          zoomIndex
         })
       );
     } catch {
       // storage may be unavailable (private mode)
     }
-  }, [selectedKeyboard.id, language, notation, fundamental, type, selectionMode]);
+  }, [selectedKeyboard.id, language, notation, fundamental, type, selectionMode, zoomIndex]);
 
   const submitFeedback = (e: React.FormEvent) => {
     e.preventDefault();
@@ -240,79 +238,90 @@ export const App: React.FC = () => {
         </div>
       </header>
 
-      <nav className="tab-bar" role="tablist" aria-label="Modes">
-        {tabButtons.map(tab => (
-          <button
-            key={tab.id}
-            className={`tab-button ${activeTab === tab.id ? "active" : ""}`}
-            role="tab"
-            aria-selected={activeTab === tab.id}
-            onClick={() => handleTabChange(tab.id)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </nav>
-
-      {(activeTab === "settings" || showSelectors) && (
-        <section className="panel-card">
-          {activeTab === "settings" ? (
-          <div className="selector-grid settings-grid">
-            <label className="field">
-              <span>{t.keyboard}</span>
-              <select
-                value={selectedKeyboard.id}
-                  onChange={e => {
-                    const kb = keyboards.find(k => k.id === e.target.value);
-                    if (kb) setSelectedKeyboard(kb);
-                  }}
-                >
-                  {keyboards.map(k => (
-                    <option key={k.id} value={k.id}>{k.name}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                <span>{t.language}</span>
-                <select value={language} onChange={e => setLanguage(e.target.value as Language)}>
-                  <option value="en">English</option>
-                  <option value="fr">Français</option>
-                </select>
-              </label>
-            <label className="field">
-              <span>{t.notation}</span>
-              <div className="toggle">
-                <button
-                  type="button"
-                  className={`toggle-option ${notation === "anglo" ? "active" : ""}`}
-                  onClick={() => setNotation("anglo")}
-                >
-                  {t.notationAnglo}
-                </button>
-                <button
-                  type="button"
-                  className={`toggle-option ${notation === "fr" ? "active" : ""}`}
-                  onClick={() => setNotation("fr")}
-                >
-                  {t.notationFrench}
-                </button>
-              </div>
-            </label>
-            <form className="field feedback" onSubmit={submitFeedback}>
-              <div className="feedback-header">
-                <span>{t.feedback}</span>
-                <button className="send-button" type="submit">{t.feedbackSend}</button>
-              </div>
-              <textarea
-                value={feedbackText}
-                onChange={e => setFeedbackText(e.target.value)}
-                placeholder={t.feedbackPlaceholder}
-                rows={4}
-              />
-            </form>
+      <section className="panel-card keyboard-card">
+        <div className="keyboard-wrapper">
+          <div className="keyboard-overlay">
+            <button
+              className="pill pill-button"
+              type="button"
+              aria-expanded={drawerOpen && drawerView === "selection"}
+              aria-label="Edit chord or scale selection"
+              onClick={() => openDrawer("selection")}
+            >
+              {selectionLabel}
+            </button>
+            <div className="zoom-controls" aria-label="Resize keyboard">
+              <button
+                className="zoom-button"
+                type="button"
+                onClick={zoomIn}
+                disabled={zoomIndex === 0}
+                aria-label="Increase keyboard size"
+              >
+                +
+              </button>
+              <button
+                className="zoom-button"
+                type="button"
+                onClick={zoomOut}
+                disabled={zoomIndex === zoomLevels.length - 1}
+                aria-label="Decrease keyboard size"
+              >
+                −
+              </button>
+            </div>
+            <div className="mode-toggle" aria-label={t.mode}>
+              <button
+                type="button"
+                className={`mode-button ${selectionMode === "chord" ? "active" : ""}`}
+                onClick={() => setSelectionMode("chord")}
+              >
+                {t.chord}
+              </button>
+              <button
+                type="button"
+                className={`mode-button ${selectionMode === "scale" ? "active" : ""}`}
+                onClick={() => setSelectionMode("scale")}
+              >
+                {t.scale}
+              </button>
+            </div>
           </div>
-        ) : (
-            <div className="selector-grid selector-inline">
+          <AccordionKeyboard
+            rows={selectedKeyboard.rows}
+            highlightNotes={highlightNotes}
+            highlightLabels={highlightLabels}
+            notation={notation}
+            scale={zoomLevels[zoomIndex]}
+          />
+          <div className="legend legend-inline">
+            <span className="legend-text">{t.legendPush}</span>
+            <span className="split-circle" aria-hidden="true">
+              <span className="half left" />
+              <span className="half right" />
+            </span>
+            <span className="legend-text">{t.legendPull}</span>
+          </div>
+          <button
+            className="settings-fab"
+            type="button"
+            aria-label={t.settings}
+            onClick={() => openDrawer("settings")}
+          >
+            ⚙︎
+          </button>
+        </div>
+      </section>
+
+      {drawerOpen && <div className="drawer-backdrop" onClick={closeDrawer} aria-hidden="true" />}
+      <aside className={`side-drawer ${drawerOpen ? "open" : ""}`} role="dialog" aria-modal="true" aria-label={drawerView === "selection" ? t.mode : t.settings}>
+        <div className="drawer-header">
+          <h2 className="drawer-title">{drawerView === "selection" ? t.mode : t.settings}</h2>
+          <button className="drawer-close" type="button" onClick={closeDrawer} aria-label="Close panel">×</button>
+        </div>
+        <div className="drawer-content">
+          {drawerView === "selection" ? (
+            <div className="selector-grid">
               <label className="field">
                 <span>{t.fundamental}</span>
                 <select value={fundamental} onChange={e => setFundamental(e.target.value)}>
@@ -335,65 +344,64 @@ export const App: React.FC = () => {
                 </select>
               </label>
             </div>
-          )}
-        </section>
-      )}
-
-      <section className="panel-card keyboard-card">
-        <div className="keyboard-top">
-          <p className="eyebrow">{selectedKeyboard.name}</p>
-          <div className="keyboard-actions">
-            <div className="zoom-controls" aria-label="Resize keyboard">
-              <button
-                className="zoom-button"
-                type="button"
-                onClick={zoomIn}
-                disabled={zoomIndex === 0}
-                aria-label="Increase keyboard size"
-              >
-                +
-              </button>
-              <button
-                className="zoom-button"
-                type="button"
-                onClick={zoomOut}
-                disabled={zoomIndex === zoomLevels.length - 1}
-                aria-label="Decrease keyboard size"
-              >
-                −
-              </button>
+          ) : (
+            <div className="selector-grid settings-grid">
+              <label className="field">
+                <span>{t.keyboard}</span>
+                <select
+                  value={selectedKeyboard.id}
+                  onChange={e => {
+                    const kb = keyboards.find(k => k.id === e.target.value);
+                    if (kb) setSelectedKeyboard(kb);
+                  }}
+                >
+                  {keyboards.map(k => (
+                    <option key={k.id} value={k.id}>{k.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>{t.language}</span>
+                <select value={language} onChange={e => setLanguage(e.target.value as Language)}>
+                  <option value="en">English</option>
+                  <option value="fr">Français</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>{t.notation}</span>
+                <div className="toggle">
+                  <button
+                    type="button"
+                    className={`toggle-option ${notation === "anglo" ? "active" : ""}`}
+                    onClick={() => setNotation("anglo")}
+                  >
+                    {t.notationAnglo}
+                  </button>
+                  <button
+                    type="button"
+                    className={`toggle-option ${notation === "fr" ? "active" : ""}`}
+                    onClick={() => setNotation("fr")}
+                  >
+                    {t.notationFrench}
+                  </button>
+                </div>
+              </label>
+              <form className="field feedback" onSubmit={submitFeedback}>
+                <div className="feedback-header">
+                  <span>{t.feedback}</span>
+                  <button className="send-button" type="submit">{t.feedbackSend}</button>
+                </div>
+                <textarea
+                  value={feedbackText}
+                  onChange={e => setFeedbackText(e.target.value)}
+                  placeholder={t.feedbackPlaceholder}
+                  rows={4}
+                />
+              </form>
             </div>
-            <button
-              className="pill pill-button"
-              type="button"
-              aria-expanded={showSelectors}
-              aria-label="Edit chord or scale selection"
-              onClick={() => setShowSelectors(v => !v)}
-            >
-              {selectionLabel}
-            </button>
-          </div>
+          )}
         </div>
-
-        <div className="keyboard-wrapper">
-          <AccordionKeyboard
-            rows={selectedKeyboard.rows}
-            highlightNotes={highlightNotes}
-            highlightLabels={highlightLabels}
-            notation={notation}
-            scale={zoomLevels[zoomIndex]}
-          />
-        </div>
-
-        <div className="legend">
-          <span className="legend-text">{t.legendPush}</span>
-          <span className="split-circle" aria-hidden="true">
-            <span className="half left" />
-            <span className="half right" />
-          </span>
-          <span className="legend-text">{t.legendPull}</span>
-        </div>
-      </section>
+      </aside>
     </div>
   );
 };

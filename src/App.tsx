@@ -325,9 +325,16 @@ export const App: React.FC = () => {
       </section>
 
       {drawerOpen && <div className="drawer-backdrop" onClick={closeDrawer} aria-hidden="true" />}
-      <aside className={`side-drawer ${drawerOpen ? "open" : ""}`} role="dialog" aria-modal="true" aria-label={drawerView === "selection" ? t.mode : t.settings}>
+      <aside
+        className={`side-drawer ${drawerOpen ? "open" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={drawerView === "selection" ? (selectionMode === "chord" ? t.chord : t.scale) : t.settings}
+      >
         <div className="drawer-header">
-          <h2 className="drawer-title">{drawerView === "selection" ? t.mode : t.settings}</h2>
+          <h2 className="drawer-title">
+            {drawerView === "selection" ? (selectionMode === "chord" ? t.chord : t.scale) : t.settings}
+          </h2>
           <button className="drawer-close" type="button" onClick={closeDrawer} aria-label="Close panel">×</button>
         </div>
         <div className="drawer-content">

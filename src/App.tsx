@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import "./App.css";
 import { AccordionKeyboard } from "./components/AccordionKeyboard";
 import { keyboards } from "./data";
@@ -79,6 +79,7 @@ const scaleLabelsFr: Record<string, string> = {
   "locrian": "locrien"
 };
 const rootNotes = ["C","C#","Db","D","D#","Eb","E","F","F#","Gb","G","G#","Ab","A","A#","Bb","B"];
+const zoomLevels = [0.7, 0.8, 0.9, 1, 1.2] as const;
 
 /**
  * Root UI for selecting an accordion layout and highlighting notes belonging
@@ -92,7 +93,6 @@ export const App: React.FC = () => {
   const [highlightLabels, setHighlightLabels] = useState<Record<number, string>>({});
   const [language, setLanguage] = useState<Language>("en");
   const [notation, setNotation] = useState<NoteNotation>("anglo");
-  const zoomLevels = [0.7, 0.8, 0.9, 1, 1.2] as const;
   const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 520px)").matches;
   const [zoomIndex, setZoomIndex] = useState(isMobile ? 1 : 3);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -109,7 +109,7 @@ export const App: React.FC = () => {
    * Compute the notes for the current chord or scale selection and store them
    * without octave markers so the keyboard can highlight matching halves.
    */
-  const applySelection = () => {
+  const applySelection = useCallback(() => {
     let notes: string[] = [];
     if (selectionMode === "chord") {
       notes = Chord.get(`${fundamental}${type}`).notes;
@@ -130,7 +130,7 @@ export const App: React.FC = () => {
 
     setHighlightNotes(normalized);
     setHighlightLabels(labels);
-  };
+  }, [fundamental, selectionMode, type]);
 
   // Keep a sensible default type when switching modes
   useEffect(() => {
@@ -144,7 +144,7 @@ export const App: React.FC = () => {
   // Apply the current selection automatically when inputs change
   useEffect(() => {
     applySelection();
-  }, [fundamental, type, selectionMode]);
+  }, [applySelection]);
 
   const selectionTypeLabel = selectionMode === "scale" && language === "fr"
     ? scaleLabelsFr[type] ?? type

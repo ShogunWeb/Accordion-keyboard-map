@@ -1,3 +1,5 @@
+import { buildVersion } from "./buildInfo";
+
 export type ServiceWorkerUpdateCallback = (registration: ServiceWorkerRegistration) => void;
 
 interface RegisterServiceWorkerOptions {
@@ -15,7 +17,9 @@ export function registerServiceWorker(options: RegisterServiceWorkerOptions = {}
 
   const swUrl = `${import.meta.env.BASE_URL}sw.js`;
   const scope = import.meta.env.BASE_URL;
+  const versionUrl = `${scope}version.json`;
   let refreshing = false;
+  let checkingForUpdates = false;
 
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (refreshing) {
@@ -27,7 +31,7 @@ export function registerServiceWorker(options: RegisterServiceWorkerOptions = {}
   });
 
   const notifyUpdate = (registration: ServiceWorkerRegistration) => {
-    if (registration.waiting && navigator.serviceWorker.controller) {
+    if (registration.waiting) {
       options.onUpdate?.(registration);
     }
   };
@@ -45,9 +49,21 @@ export function registerServiceWorker(options: RegisterServiceWorkerOptions = {}
     });
   };
 
+  const readRemoteVersion = () =>
+    fetch(`${versionUrl}?t=${Date.now()}`, { cache: "no-store" })
+      .then((response) => {
+        if (!response.ok) {
+          return undefined;
+        }
+
+        return response.json() as Promise<{ version?: string }>;
+      })
+      .then((data) => data?.version)
+      .catch(() => undefined);
+
   const register = () =>
     navigator.serviceWorker
-      .register(swUrl, { scope })
+      .register(swUrl, { scope, updateViaCache: "none" })
       .then((registration) => {
         notifyUpdate(registration);
 
@@ -55,9 +71,36 @@ export function registerServiceWorker(options: RegisterServiceWorkerOptions = {}
           trackInstallingWorker(registration);
         });
 
-        const checkForUpdates = () => registration.update().catch(() => {});
+        const checkForUpdates = async () => {
+          if (checkingForUpdates) {
+            return;
+          }
+
+          checkingForUpdates = true;
+          try {
+            const remoteVersion = await readRemoteVersion();
+            if (remoteVersion && remoteVersion !== buildVersion) {
+              await registration.update();
+              notifyUpdate(registration);
+              window.setTimeout(() => notifyUpdate(registration), 1000);
+              window.setTimeout(() => notifyUpdate(registration), 4000);
+              return;
+            }
+
+            await registration.update();
+            notifyUpdate(registration);
+          } catch {
+            // Update checks are best-effort and should never block the app.
+          } finally {
+            checkingForUpdates = false;
+          }
+        };
 
         checkForUpdates();
+        window.setTimeout(checkForUpdates, 3000);
+        window.addEventListener("focus", checkForUpdates);
+        window.addEventListener("online", checkForUpdates);
+        window.addEventListener("pageshow", checkForUpdates);
         document.addEventListener("visibilitychange", () => {
           if (document.visibilityState === "visible") {
             checkForUpdates();

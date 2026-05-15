@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { writeFile } from "node:fs/promises";
 
 const createBuildVersion = () => {
   const now = new Date();
@@ -32,4 +33,8 @@ const run = (command, args) =>
 
 await run("tsc", ["-b"]);
 await run("vite", ["build"]);
+await writeFile(
+  new URL("../dist/version.json", import.meta.url),
+  `${JSON.stringify({ version: buildVersion })}\n`
+);
 await run("node", ["scripts/stamp-sw.mjs"]);

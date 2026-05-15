@@ -63,6 +63,11 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  if (url.pathname === `${BASE_PATH}version.json`) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   if (event.request.mode === "navigate") {
     event.respondWith(
       caches

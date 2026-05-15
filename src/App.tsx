@@ -7,6 +7,7 @@ import favicon from "/favicon.svg";
 import { Chord, Scale } from "tonal";
 import { formatNoteLabel, toPitchClass } from "./utils/noteUtils";
 import type { NoteNotation } from "./utils/noteUtils";
+import { activateServiceWorkerUpdate, registerServiceWorker } from "./serviceWorker";
 
 type Language = "en" | "fr";
 const STORAGE_KEY = "akm-settings";
@@ -35,7 +36,10 @@ const translations: Record<Language, Record<string, string>> = {
     feedback: "Feedback",
     feedbackPlaceholder: "Please send any feedback regarding the use of the app.",
     feedbackSend: "Send feedback",
-    showLegend: "Show legend"
+    showLegend: "Show legend",
+    updateAvailable: "New version available",
+    updateNow: "Update",
+    updateLater: "Later"
   },
   fr: {
     title: "Clavier d'accordéon",
@@ -59,7 +63,10 @@ const translations: Record<Language, Record<string, string>> = {
     feedback: "Retour",
     feedbackPlaceholder: "Veuillez envoyer tout retour sur l'utilisation de l'application.",
     feedbackSend: "Envoyer",
-    showLegend: "Afficher la légende"
+    showLegend: "Afficher la légende",
+    updateAvailable: "Nouvelle version disponible",
+    updateNow: "Mettre à jour",
+    updateLater: "Plus tard"
   }
 };
 
@@ -99,11 +106,16 @@ export const App: React.FC = () => {
   const [drawerView, setDrawerView] = useState<"selection" | "settings">("selection");
   const [feedbackText, setFeedbackText] = useState("");
   const [showLegend, setShowLegend] = useState(true);
+  const [updateRegistration, setUpdateRegistration] = useState<ServiceWorkerRegistration | null>(null);
 
   const [fundamental, setFundamental] = useState("C");
   const [type, setType] = useState("maj");
 
   const t = useMemo(() => translations[language], [language]);
+
+  useEffect(() => {
+    registerServiceWorker({ onUpdate: setUpdateRegistration });
+  }, []);
 
   /**
    * Compute the notes for the current chord or scale selection and store them
@@ -229,6 +241,14 @@ export const App: React.FC = () => {
       // storage may be unavailable (private mode)
     }
   }, [selectedKeyboard.id, language, notation, fundamental, type, selectionMode, zoomIndex, showLegend]);
+
+  const updateAvailable = updateRegistration !== null;
+
+  const updateApp = () => {
+    if (updateRegistration) {
+      activateServiceWorkerUpdate(updateRegistration);
+    }
+  };
 
   const submitFeedback = (e: React.FormEvent) => {
     e.preventDefault();
@@ -442,6 +462,20 @@ export const App: React.FC = () => {
           )}
         </div>
       </aside>
+
+      {updateAvailable && (
+        <div className="update-toast" role="status" aria-live="polite">
+          <span>{t.updateAvailable}</span>
+          <div className="update-actions">
+            <button className="update-button primary" type="button" onClick={updateApp}>
+              {t.updateNow}
+            </button>
+            <button className="update-button" type="button" onClick={() => setUpdateRegistration(null)}>
+              {t.updateLater}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

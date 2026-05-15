@@ -1,4 +1,5 @@
-const CACHE_NAME = "accordion-keyboard-map-v1";
+const APP_VERSION = "__AKM_BUILD_VERSION__";
+const CACHE_NAME = `accordion-keyboard-map-${APP_VERSION}`;
 const BASE_PATH = (() => {
   const scopePath = self.registration?.scope
     ? new URL(self.registration.scope).pathname
@@ -21,9 +22,9 @@ self.addEventListener("install", (event) => {
     caches
       .open(CACHE_NAME)
       .then((cache) => cache.addAll(PRECACHE_URLS))
-      .then(() => self.skipWaiting())
       .catch((error) => {
         console.error("Service worker install failed:", error);
+        throw error;
       })
   );
 });
@@ -43,6 +44,12 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") {
     return;
@@ -52,23 +59,16 @@ self.addEventListener("fetch", (event) => {
   const isSameOrigin = url.origin === self.location.origin;
   const isInScope = url.pathname.startsWith(BASE_PATH);
 
-  if (event.request.mode === "navigate") {
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          const copy = response.clone();
-          caches
-            .open(CACHE_NAME)
-            .then((cache) => cache.put(`${BASE_PATH}index.html`, copy))
-            .catch(() => {});
-          return response;
-        })
-        .catch(() => caches.match(`${BASE_PATH}index.html`))
-    );
+  if (!isSameOrigin || !isInScope) {
     return;
   }
 
-  if (!isSameOrigin || !isInScope) {
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      caches
+        .match(`${BASE_PATH}index.html`)
+        .then((cachedResponse) => cachedResponse ?? fetch(event.request))
+    );
     return;
   }
 
@@ -78,16 +78,14 @@ self.addEventListener("fetch", (event) => {
         return cachedResponse;
       }
 
-      return fetch(event.request)
-        .then((networkResponse) => {
-          const copy = networkResponse.clone();
-          caches
-            .open(CACHE_NAME)
-            .then((cache) => cache.put(event.request, copy))
-            .catch(() => {});
-          return networkResponse;
-        })
-        .catch(() => cachedResponse);
+      return fetch(event.request).then((networkResponse) => {
+        const copy = networkResponse.clone();
+        caches
+          .open(CACHE_NAME)
+          .then((cache) => cache.put(event.request, copy))
+          .catch(() => {});
+        return networkResponse;
+      });
     })
   );
 });

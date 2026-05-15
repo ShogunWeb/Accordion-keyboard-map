@@ -364,6 +364,13 @@
   height: 18px;
 }
 
+.build-version {
+  margin: -4px 0 0;
+  color: #64748b;
+  font-size: 0.72rem;
+  text-align: center;
+}
+
 .settings-fab {
   position: absolute;
   bottom: 30px;

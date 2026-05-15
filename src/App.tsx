@@ -8,6 +8,7 @@ import { Chord, Scale } from "tonal";
 import { formatNoteLabel, toPitchClass } from "./utils/noteUtils";
 import type { NoteNotation } from "./utils/noteUtils";
 import { activateServiceWorkerUpdate, registerServiceWorker } from "./serviceWorker";
+import { buildVersion } from "./buildInfo";
 
 type Language = "en" | "fr";
 const STORAGE_KEY = "akm-settings";
@@ -39,7 +40,8 @@ const translations: Record<Language, Record<string, string>> = {
     showLegend: "Show legend",
     updateAvailable: "New version available",
     updateNow: "Update",
-    updateLater: "Later"
+    updateLater: "Later",
+    buildLabel: "Build"
   },
   fr: {
     title: "Clavier d'accordéon",
@@ -66,7 +68,8 @@ const translations: Record<Language, Record<string, string>> = {
     showLegend: "Afficher la légende",
     updateAvailable: "Nouvelle version disponible",
     updateNow: "Mettre à jour",
-    updateLater: "Plus tard"
+    updateLater: "Plus tard",
+    buildLabel: "Build n°"
   }
 };
 
@@ -458,6 +461,7 @@ export const App: React.FC = () => {
                 </svg>
                 <span>Source code</span>
               </a>
+              <p className="build-version">{t.buildLabel} {buildVersion}</p>
             </div>
           )}
         </div>

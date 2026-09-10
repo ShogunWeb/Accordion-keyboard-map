@@ -1,0 +1,193 @@
+# LLM-context.txt — Accordion Keyboard Visualizer (Accordion-keyboard-map)
+
+Ce fichier résume le projet pour donner un contexte rapide à une LLM qui doit
+commencer à travailler sur cette application. Généré le 2026-09-10 par analyse
+du code source (pas une doc officielle — à revalider si le code a bougé).
+
+## 1. Vue d'ensemble
+
+PWA (React + TypeScript + Vite) qui affiche le clavier main droite d'un
+accordéon diatonique/unisonorique en SVG, et met en évidence les notes d'un
+accord ou d'une gamme sélectionnés (calculés via Tonal.js). Projet perso,
+déployé sur GitHub Pages, sous licence AGPLv3+.
+
+- Repo GitHub : https://github.com/ShogunWeb/Accordion-keyboard-map
+- App en ligne : https://shogunweb.github.io/Accordion-keyboard-map/
+- Auteur/contact feedback : accordion@shogunweb.be (formulaire "feedback" → mailto)
+- Chemin réel sur disque : `/workspaces/Accordeon-project/Accordion-keyboard-map`
+  (le dossier parent `Accordeon-project` n'est PAS un repo git ; le vrai repo
+  git est dans le sous-dossier `Accordion-keyboard-map/`)
+- Branche courante : `main`, à jour avec `origin/main`, working tree propre.
+
+## 2. Stack technique
+
+- React 19 + TypeScript, build/dev via Vite 7
+- Tailwind CSS 4 (intégré via `@tailwindcss/postcss`, pas de config JS custom lourde)
+- Tonal.js (`tonal`) pour la théorie musicale (accords/gammes/pitch class)
+- Rendu clavier en SVG pur (pas de canvas, pas de lib graphique)
+- Tests : Vitest + @testing-library/react + jsdom
+- Lint : ESLint 9 (flat config) + typescript-eslint
+- Docs API : Typedoc (`npm run docs`)
+- PWA : service worker fait main (pas de plugin vite-pwa), manifest.webmanifest
+
+## 3. Scripts npm (package.json)
+
+- `npm run dev` — serveur de dev Vite (http://localhost:5173)
+- `npm run build` — build custom via `scripts/build.mjs` : `tsc -b` → `vite build`
+  → écrit `dist/version.json` → tamponne `dist/sw.js` avec le build version
+  (voir §6 versioning/PWA)
+- `npm run preview` — preview du build de prod
+- `npm run lint` — ESLint
+- `npm test` — Vitest
+- `npm run docs` — génère la doc Typedoc
+
+Pré-requis : Node.js ≥ 18, npm.
+
+## 4. Structure du code
+
+```
+src/
+  main.tsx                     # point d'entrée React
+  App.tsx                      # composant racine : état UI, i18n, logique tonal.js
+  App.css / index.css / styles.css  # styles (Tailwind importé dans styles.css)
+  buildInfo.ts                 # expose buildVersion (injecté au build, voir vite.config.ts)
+  serviceWorker.ts             # enregistrement + gestion des updates du SW
+  components/
+    AccordionKeyboard.tsx      # rendu SVG pur du clavier (aucune logique musicale)
+    AccordionKeyboard.test.tsx
+  data/
+    types.ts                   # types partagés : ButtonLayout, KeyboardRow, KeyboardDefinition
+    index.ts                   # charge tous les *.keyboard.ts via import.meta.glob, trie par name
+    keyboards/
+      dg.keyboard.ts           # id "DG" — Clavier D/G
+      gc.keyboard.ts           # id "GC" — Clavier G/C
+      gcf.keyboard.ts          # id "GCF" — Clavier G/C/F
+      image-3rangs.keyboard.ts # id "image-3rangs" — Serafini 3 rangs, basses Darwin (clavier par défaut de l'app)
+  utils/
+    noteUtils.ts                # toPitchClass() (via Tonal.Note), formatNoteLabel() (anglo/fr)
+public/
+  manifest.webmanifest, sw.js, favicon.svg, icons/
+scripts/
+  build.mjs        # orchestre tsc + vite build + version.json + stamp-sw
+  stamp-sw.mjs      # remplace __AKM_BUILD_VERSION__ dans dist/sw.js
+docs/
+  index.md, SUMMARY.md
+  user/getting-started.md      # doc utilisateur (comment utiliser l'app)
+  dev/architecture.md          # doc archi (à jour avec le code actuel)
+  dev/data-model.md            # doc du modèle de données des claviers
+  dev/contributing.md          # note : mentionne encore un ancien fichier `data/keyboards.ts`
+                                  monolithique — obsolète, la structure réelle est
+                                  `data/keyboards/*.keyboard.ts` (voir ci-dessus)
+```
+
+## 5. Modèle de données clavier
+
+```ts
+type KeyboardDefinition = { id: string; name: string; rows: KeyboardRow[] };
+type KeyboardRow = { offsetY: number; buttons: ButtonLayout[] };
+type ButtonLayout = { index: number; push: string; pull: string };
+```
+
+- `rows` : ordonnées **droite → gauche**
+- `buttons` dans une row : ordonnés **bas → haut**, `index` commence à 1
+- `offsetY` : décalage vertical en **demi-bouton** (0 = aligné, 1 = décalé d'un
+  demi-bouton, 2 = un bouton entier, etc.) — modélise le quinconce typique des
+  accordéons diatoniques
+- `push`/`pull` : note en poussé/tiré, ex. `"C4"`, `"F#"`, `"Bb4"`, ou `""` si inconnue
+
+Pour ajouter un clavier : créer `src/data/keyboards/mon-clavier.keyboard.ts`
+avec un `export default` de type `KeyboardDefinition` ; auto-chargé par
+`import.meta.glob` dans `data/index.ts`, trié alphabétiquement par `name`
+dans le sélecteur. Pas besoin de toucher un fichier central.
+
+## 6. Logique applicative (App.tsx)
+
+- État principal : clavier sélectionné, mode (`chord`/`scale`), fondamentale,
+  type d'accord/gamme, langue (`en`/`fr`), notation (`anglo`/`fr` = Do Ré Mi),
+  niveau de zoom, affichage de la légende, ouverture d'un drawer latéral
+  (vue "selection" ou "settings").
+- `applySelection()` : appelle `Chord.get()` ou `Scale.get()` de Tonal.js,
+  normalise les notes en pitch class (0–11) via `toPitchClass`, construit une
+  map pitch-class → label pour respecter l'accidentale choisie (# vs b), et
+  passe `highlightNotes`/`highlightLabels` à `AccordionKeyboard`.
+- i18n : dictionnaire de traductions `en`/`fr` codé en dur dans `App.tsx`
+  (pas de lib i18n). Langue auto-détectée depuis `navigator.language` si rien
+  n'est sauvegardé.
+- Persistance : `localStorage` sous la clé `akm-settings` (clavier, langue,
+  notation, fondamentale, type, mode, zoom, showLegend).
+- Feedback utilisateur : formulaire texte qui ouvre un `mailto:` vers
+  accordion@shogunweb.be.
+- Lien "Source code" vers le repo GitHub dans le panneau Réglages.
+
+## 7. Rendu SVG (AccordionKeyboard.tsx)
+
+- Ne contient AUCUNE logique musicale : reçoit `rows`, `highlightNotes`
+  (pitch classes), `highlightLabels`, `notation`, `scale`.
+- Chaque bouton = un cercle divisé en 2 demi-disques (gauche = push, droite =
+  pull), coloré en bleu (`#4A90E2`) si push highlighted, orange (`#F5A623`)
+  si pull highlighted, sinon blanc/gris.
+- Positionnement : colonnes = rows (droite → gauche), position verticale
+  calculée à partir de `bIdx * buttonSpacingY + (offsetY * buttonSize) / 2`.
+- `scale` (prop) pilote une taille de bouton responsive (zoomLevels dans
+  App.tsx : `[0.7, 0.8, 0.9, 1, 1.2]`).
+
+## 8. PWA / Service Worker / versioning
+
+- `public/sw.js` contient un placeholder `__AKM_BUILD_VERSION__` remplacé au
+  build par `scripts/stamp-sw.mjs`. Stratégie de cache : cache-first pour les
+  assets, cache de `index.html` servi pour toute navigation (SPA offline),
+  `version.json` toujours fetché depuis le réseau (`cache: "no-store"`).
+- `src/serviceWorker.ts` : enregistre le SW (skip en dev via
+  `import.meta.env.DEV`), poll `version.json` pour détecter une nouvelle
+  version et affiche un toast "update available" dans l'UI (App.tsx,
+  `updateAvailable` / `activateServiceWorkerUpdate`), avec message
+  `SKIP_WAITING` postMessage au SW en attente puis reload au `controllerchange`.
+- Version de build générée par `scripts/build.mjs` (format `YYYYMMDD-HHMM-RAND`,
+  ou surchargée via la variable d'env `AKM_BUILD_VERSION`), injectée aussi
+  côté client via `define: { __AKM_BUILD_VERSION__ }` dans `vite.config.ts` →
+  exposée par `src/buildInfo.ts` et affichée dans le panneau Réglages
+  ("Build n° ...").
+- `vite.config.ts` fixe `base: "/Accordion-keyboard-map/"` — important pour le
+  déploiement GitHub Pages (sous-chemin). À adapter si déployé ailleurs (OVH,
+  racine, etc.).
+- `manifest.webmanifest` : nom "Diatonic Keyboard", `display: standalone`,
+  icônes 192/512/512-maskable/180.
+
+## 9. CI/CD
+
+`.github/workflows/deploy.yml` (un seul workflow "CI and Deploy") :
+- Sur push/PR/workflow_dispatch : checkout, Node 20, `npm ci`, `npm run build`,
+  `npm test`.
+- Si push sur `main` (pas une PR) : upload de `dist/` comme artefact Pages,
+  puis job `deploy` qui publie sur GitHub Pages via `actions/deploy-pages`.
+
+## 10. Tests existants
+
+- `src/components/AccordionKeyboard.test.tsx` (70 lignes) — tests du rendu SVG
+- `scripts/build-version.test.ts` (35 lignes) — tests de la génération du
+  build version
+- Setup Vitest : `src/setupTests.ts`, environnement `jsdom`.
+
+## 11. Points d'attention / dette identifiée
+
+- La doc `docs/dev/contributing.md` référence encore l'ancienne structure
+  `src/data/keyboards.ts` (fichier unique) — **obsolète**, le code réel utilise
+  `src/data/keyboards/*.keyboard.ts` (un fichier par clavier). Se fier au code
+  et à `docs/dev/data-model.md`/`architecture.md` qui sont à jour.
+- Pas de gestion du clavier main gauche (basses) — mentionné comme piste
+  d'extension future dans `docs/dev/architecture.md`.
+- Pas de routing, app mono-page.
+- i18n limitée à en/fr, codée en dur (pas de fichiers de traduction séparés).
+- README liste "Import/export of keyboard JSON layouts" comme amélioration
+  future non implémentée.
+
+## 12. Pour démarrer rapidement
+
+```bash
+cd Accordion-keyboard-map
+npm install
+npm run dev        # http://localhost:5173
+npm test            # vitest
+npm run lint
+npm run build        # build de prod (dist/)
+```

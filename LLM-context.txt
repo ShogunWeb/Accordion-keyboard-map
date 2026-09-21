@@ -1,8 +1,9 @@
 # LLM-context.txt — Accordion Keyboard Visualizer (Accordion-keyboard-map)
 
 This file summarizes the project to give an LLM quick context before it
-starts working on this application. Generated on 2026-09-10 from source code
-analysis (not official docs — re-validate if the code has moved on).
+starts working on this application. Reviewed against source code on
+2026-09-21. Treat the code and configuration as the source of truth;
+re-validate this summary when they change.
 
 ## 1. Overview
 
@@ -14,15 +15,18 @@ Pages, licensed under AGPLv3+.
 - GitHub repo: https://github.com/ShogunWeb/Accordion-keyboard-map
 - Live app: https://shogunweb.github.io/Accordion-keyboard-map/
 - Feedback contact: accordion@shogunweb.be (in-app "feedback" form → mailto)
-- Actual path on disk: `/workspaces/Accordeon-project/Accordion-keyboard-map`
-  (the parent folder `Accordeon-project` is NOT a git repo; the actual git
-  repo lives in the subfolder `Accordion-keyboard-map/`)
-- Current branch: `main`, up to date with `origin/main`, clean working tree.
+- Commands below assume the repository root (contains `package.json`).
+  Discover it with `git rev-parse --show-toplevel`; paths vary by environment.
+- At session start, inspect `git status --short --branch` and any applicable
+  repository instructions. Preserve existing user changes; do not assume a
+  particular branch, clean working tree, or synchronization with the remote.
 
 ## 2. Tech stack
 
 - React 19 + TypeScript, build/dev via Vite 7
-- Tailwind CSS 4 (wired via `@tailwindcss/postcss`, no heavy custom JS config)
+- Styling currently uses plain CSS in `src/styles.css` and `src/App.css`.
+  Tailwind CSS 4 is installed and configured via `@tailwindcss/postcss`, but
+  the CSS entry point does not import Tailwind or include its directives.
 - Tonal.js (`tonal`) for music theory (chords/scales/pitch class)
 - Keyboard rendered in pure SVG (no canvas, no graphics library)
 - Tests: Vitest + @testing-library/react + jsdom
@@ -32,16 +36,21 @@ Pages, licensed under AGPLv3+.
 
 ## 3. npm scripts (package.json)
 
-- `npm run dev` — Vite dev server (http://localhost:5173)
+- `npm run dev` — Vite dev server (normally
+  http://localhost:5173/Accordion-keyboard-map/; use the URL Vite prints)
 - `npm run build` — custom build via `scripts/build.mjs`: `tsc -b` → `vite build`
   → writes `dist/version.json` → stamps `dist/sw.js` with the build version
-  (see §6 versioning/PWA)
+  (see §8 versioning/PWA)
 - `npm run preview` — preview the production build
 - `npm run lint` — ESLint
-- `npm test` — Vitest
+- `npm test` — Vitest (normally watch mode locally); use `npm test -- --run`
+  for a single validation run
 - `npm run docs` — generate Typedoc docs
 
-Requirements: Node.js ≥ 18, npm.
+Requirements: npm and a Node.js version satisfying `^20.19.0 || >=22.12.0`
+(the installed Vite 7 and React plugin engine requirement). The devcontainer
+uses Node 24; CI selects Node 20. Use `npm ci` for reproducible installation
+from the committed `package-lock.json`.
 
 ## 4. Code structure
 
@@ -49,11 +58,13 @@ Requirements: Node.js ≥ 18, npm.
 src/
   main.tsx                     # React entry point
   App.tsx                      # root component: UI state, i18n, tonal.js logic
-  App.css / index.css / styles.css  # styles (Tailwind imported in styles.css)
+  App.css                      # application styles, imported by App.tsx
+  styles.css                   # global styles, imported by main.tsx
+  index.css                    # unused starter stylesheet (not imported)
   buildInfo.ts                 # exposes buildVersion (injected at build time, see vite.config.ts)
   serviceWorker.ts             # SW registration + update handling
   components/
-    AccordionKeyboard.tsx      # pure SVG rendering of the keyboard (no music logic)
+    AccordionKeyboard.tsx      # SVG layout, pitch-class matching and note labels
     AccordionKeyboard.test.tsx
   data/
     types.ts                   # shared types: ButtonLayout, KeyboardRow, KeyboardDefinition
@@ -70,11 +81,12 @@ public/
 scripts/
   build.mjs        # orchestrates tsc + vite build + version.json + stamp-sw
   stamp-sw.mjs      # replaces __AKM_BUILD_VERSION__ in dist/sw.js
+  build-version.test.ts # checks source placeholder and generated version consistency
 docs/
   index.md, SUMMARY.md
   user/getting-started.md      # user docs (how to use the app)
-  dev/architecture.md          # architecture docs (in sync with current code)
-  dev/data-model.md            # docs for the keyboard data model
+  dev/architecture.md          # architecture overview; partly outdated (see §11)
+  dev/data-model.md            # data model; normalization guidance is partly aspirational
   dev/contributing.md          # note: still references an older monolithic
                                   `data/keyboards.ts` file — outdated, the real
                                   structure is `data/keyboards/*.keyboard.ts`
@@ -90,17 +102,21 @@ type ButtonLayout = { index: number; push: string; pull: string };
 ```
 
 - `rows`: ordered **right → left**
-- `buttons` within a row: ordered **bottom → top**, `index` starts at 1
+- `buttons` within a row: ordered **bottom → top**, `index` starts at 1.
+  Array order determines position; `index` is only the displayed number.
 - `offsetY`: vertical offset in **half-button units** (0 = aligned, 1 = shifted
   by half a button, 2 = one full button, etc.) — models the typical staggered
-  (quincunx) layout of diatonic accordions
+  (quincunx) layout of diatonic accordions. Positive offsets move a row upward.
 - `push`/`pull`: note on push/pull, e.g. `"C4"`, `"F#"`, `"Bb4"`, or `""` if
-  unknown
+  unknown. Store notes using letter names and ASCII accidentals (`#`, `b`);
+  French notation is an output format, not a data-entry convention. The
+  helpers do not explicitly normalize French input or Unicode accidentals.
 
 To add a keyboard: create `src/data/keyboards/my-keyboard.keyboard.ts` with a
 default export of type `KeyboardDefinition`; it's auto-loaded by
 `import.meta.glob` in `data/index.ts`, sorted alphabetically by `name` in the
-selector. No need to touch a central file.
+selector. Use a unique, stable `id` (also used in saved preferences).
+No need to touch a central file.
 
 ## 6. Application logic (App.tsx)
 
@@ -112,24 +128,33 @@ selector. No need to touch a central file.
   normalizes the notes to pitch classes (0–11) via `toPitchClass`, builds a
   pitch-class → label map to respect the chosen accidental (# vs b), and
   passes `highlightNotes`/`highlightLabels` to `AccordionKeyboard`.
+- Selection is applied automatically when root, type or mode changes;
+  there is no Apply button. Switching modes resets the type to `maj` for
+  chords or `major` for scales.
 - i18n: `en`/`fr` translation dictionary hardcoded in `App.tsx` (no i18n
   library). Language auto-detected from `navigator.language` if nothing is
   saved yet.
-- Persistence: `localStorage` under the `akm-settings` key (keyboard,
-  language, notation, root note, type, mode, zoom, showLegend).
+- Persistence: `localStorage` under the `akm-settings` key, with fields
+  `keyboardId`, `language`, `notation`, `fundamental`, `type`, `selectionMode`,
+  `zoomIndex`, `showLegend`. Check restoration after reload when changing
+  initialization or mode effects; persistence is not covered by tests.
 - User feedback: text form that opens a `mailto:` link to
   accordion@shogunweb.be.
 - "Source code" link to the GitHub repo in the Settings panel.
 
 ## 7. SVG rendering (AccordionKeyboard.tsx)
 
-- Contains NO music logic: receives `rows`, `highlightNotes` (pitch classes),
-  `highlightLabels`, `notation`, `scale`.
+- Receives `rows`, `highlightNotes` (pitch classes), `highlightLabels`,
+  `notation`, `scale`. Does not compute chords or scales, but converts button
+  notes with `toPitchClass`, matches highlights, and formats note labels.
+  Matching uses numeric chroma (0–11), so enharmonic notes such as Bb and A#
+  match regardless of octave. Highlighted labels use the selection's spelling.
 - Each button = a circle split into 2 halves (left = push, right = pull),
   colored blue (`#4A90E2`) when push is highlighted, orange (`#F5A623`) when
   pull is highlighted, otherwise white/gray.
 - Positioning: columns = rows (right → left), vertical position computed from
-  `bIdx * buttonSpacingY + (offsetY * buttonSize) / 2`.
+  `position = bIdx * buttonSpacingY + (offsetY * buttonSize) / 2`, then
+  `y = verticalPadding + (maxPos - position) + buttonRadius` to draw bottom → top.
 - `scale` (prop) drives a responsive button size (zoomLevels in App.tsx:
   `[0.7, 0.8, 0.9, 1, 1.2]`).
 
@@ -140,10 +165,11 @@ selector. No need to touch a central file.
   assets, cached `index.html` served for any navigation (offline SPA),
   `version.json` always fetched from the network (`cache: "no-store"`).
 - `src/serviceWorker.ts`: registers the SW (skipped in dev via
-  `import.meta.env.DEV`), polls `version.json` to detect a new version and
-  shows an "update available" toast in the UI (App.tsx, `updateAvailable` /
-  `activateServiceWorkerUpdate`), posting a `SKIP_WAITING` message to the
-  waiting SW then reloading on `controllerchange`.
+  `import.meta.env.DEV`), checks `version.json` at registration, after a short
+  delay, and on focus/online/pageshow/visibility events (no periodic interval).
+  A waiting SW triggers the "update available" UI in App.tsx. Choosing Update
+  calls `activateServiceWorkerUpdate`, posts `SKIP_WAITING` to the waiting SW,
+  then reloads on `controllerchange`.
 - Build version generated by `scripts/build.mjs` (format `YYYYMMDD-HHMM-RAND`,
   or overridden via the `AKM_BUILD_VERSION` env var), also injected client-side
   via `define: { __AKM_BUILD_VERSION__ }` in `vite.config.ts` → exposed by
@@ -153,6 +179,11 @@ selector. No need to touch a central file.
   etc.).
 - `manifest.webmanifest`: name "Diatonic Keyboard", `display: standalone`,
   icons 192/512/512-maskable/180.
+- Use `npm run build` rather than invoking `vite build` directly, so the
+  client, service worker and version.json receive the same version. Edit
+  `public/sw.js`, not the generated copy in `dist/`.
+- Validate offline/update behavior with `npm run build` and `npm run preview`
+  at the configured subpath; development mode does not register a SW.
 
 ## 9. CI/CD
 
@@ -161,19 +192,34 @@ selector. No need to touch a central file.
   `npm test`.
 - On push to `main` (not a PR): uploads `dist/` as a Pages artifact, then a
   `deploy` job publishes to GitHub Pages via `actions/deploy-pages`.
+- Lint is not currently part of this workflow; run it locally.
 
 ## 10. Existing tests
 
-- `src/components/AccordionKeyboard.test.tsx` (70 lines) — SVG rendering tests
-- `scripts/build-version.test.ts` (35 lines) — build version generation tests
+- `src/components/AccordionKeyboard.test.tsx` — 3 tests: button/label rendering,
+  push/pull highlight colors, and scaled button radius.
+- `scripts/build-version.test.ts` — 2 tests: source placeholder presence and
+  version consistency across generated files. The latter returns without
+  checking artifacts if `dist/version.json` is absent: build before testing.
+  It expects `YYYYMMDD-HHMM-NNNN`, including when `AKM_BUILD_VERSION` is set.
 - Vitest setup: `src/setupTests.ts`, `jsdom` environment.
+- No automated coverage of App interactions, preference restoration, PWA
+  lifecycle/offline behavior, or full browser/mobile rendering.
+- Baseline on 2026-09-21, Node 24.14.1: lint and build succeeded; all 5 tests
+  passed after building. Build reported outdated Browserslist data (nonfatal).
+  No browser-based visual or PWA validation was performed in this review.
 
 ## 11. Known gaps / tech debt
 
 - `docs/dev/contributing.md` still references the older
   `src/data/keyboards.ts` (single-file) structure — **outdated**, the actual
-  code uses `src/data/keyboards/*.keyboard.ts` (one file per keyboard). Trust
-  the code and `docs/dev/data-model.md`/`architecture.md`, which are current.
+  code uses `src/data/keyboards/*.keyboard.ts` (one file per keyboard).
+- README's structure tree also contains obsolete paths. `architecture.md`
+  describes Tailwind directives absent from the CSS and suggests adding
+  persistence that already exists. Its normalization guidance and that in
+  `data-model.md` are partly aspirational: actual helpers are `toPitchClass`
+  and `formatNoteLabel` in `src/utils/noteUtils.ts`, not `utils/notes.ts`.
+  Prefer source code/configuration when documentation disagrees.
 - No handling of the left-hand (bass) keyboard — noted as a future extension
   in `docs/dev/architecture.md`.
 - No routing, single-page app.
@@ -183,11 +229,39 @@ selector. No need to touch a central file.
 
 ## 12. Quick start
 
+From the repository root, install dependencies and start development:
+
 ```bash
-cd Accordion-keyboard-map
-npm install
-npm run dev        # http://localhost:5173
-npm test            # vitest
-npm run lint
-npm run build        # production build (dist/)
+npm ci
+npm run dev        # normally http://localhost:5173/Accordion-keyboard-map/
 ```
+
+Run validation separately (dev is a long-running server):
+
+```bash
+npm run lint
+npm run build      # TypeScript + production build + version stamping
+npm test -- --run  # single run; build artifacts must already exist
+```
+
+For changes affecting UI or behavior, also check the relevant scenarios in
+a browser:
+
+- Switch layouts and verify row order, staggering and push/pull halves.
+- Try chord and scale modes, including sharps/flats and enharmonic notes.
+- Change language and note notation independently; check zoom and mobile layout.
+- Reload after changing preferences, including a non-default chord/scale type.
+- For PWA changes, use preview to check offline loading after assets are cached,
+  then a second build with a new version to check the update prompt and reload.
+
+## 13. Working-session guidance
+
+- Read the relevant source before editing; this file is a starting map.
+- Preserve the data conventions in §5, chroma-based matching, and the separate
+  language/notation settings when changing musical or display behavior.
+- Keep both translation dictionaries in sync when adding translatable UI text.
+- Treat `dist/` as generated output; change sources and rebuild.
+- Report the checks actually run and any remaining validation limits.
+- Update this context when architecture, commands, data conventions or PWA
+  behavior change. Keep task-specific goals and progress in the session rather
+  than recording temporary Git state or machine-specific paths here.

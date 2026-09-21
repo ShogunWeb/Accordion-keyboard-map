@@ -12,8 +12,10 @@
     "test": "vitest"
   },
   "dependencies": {
+    "jspdf": "^4.2.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "svg2pdf.js": "^2.8.1",
     "tonal": "^6.4.2"
   },
   "devDependencies": {

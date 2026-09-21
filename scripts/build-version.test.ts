@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -23,7 +23,9 @@ describe("build version", () => {
     const serviceWorkerVersion = readText("dist/sw.js").match(/APP_VERSION = "([^"]+)"/)?.[1];
     expect(serviceWorkerVersion).toBe(versionJson.version);
 
-    const jsBundle = readdirSync("dist/assets").find((file) => file.endsWith(".js"));
+    // Lazy-loaded features add bundles: inspect the actual application entry.
+    const jsBundle = readText("dist/index.html")
+      .match(/<script\b[^>]*\bsrc="[^"]*\/assets\/([^"/]+\.js)"/)?.[1];
     expect(jsBundle).toBeDefined();
 
     const appBuildVersions = [

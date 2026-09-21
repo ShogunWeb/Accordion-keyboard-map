@@ -1,11 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import "./App.css";
 import { AccordionKeyboard } from "./components/AccordionKeyboard";
 import { keyboards } from "./data";
 import type { KeyboardDefinition } from "./data";
 import favicon from "/favicon.svg";
-import { Chord, Scale } from "tonal";
-import { formatNoteLabel, toPitchClass } from "./utils/noteUtils";
+import { formatNoteLabel } from "./utils/noteUtils";
+import { chordTypes, getSelectionHighlights, rootNotes } from "./utils/musicUtils";
+import { Songbook } from "./components/Songbook";
+import { useSongbook } from "./hooks/useSongbook";
+import type { ChordSpec } from "./data/songs";
 import type { NoteNotation } from "./utils/noteUtils";
 import { activateServiceWorkerUpdate, registerServiceWorker } from "./serviceWorker";
 import { buildVersion } from "./buildInfo";
@@ -41,7 +44,11 @@ const translations: Record<Language, Record<string, string>> = {
     updateAvailable: "New version available",
     updateNow: "Update",
     updateLater: "Later",
-    buildLabel: "Build"
+    buildLabel: "Build",
+    explore: "Keyboard",
+    songs: "My songs",
+    addToSong: "Add to a song",
+    navigation: "Views"
   },
   fr: {
     title: "Clavier d'accordéon",
@@ -69,12 +76,14 @@ const translations: Record<Language, Record<string, string>> = {
     updateAvailable: "Nouvelle version disponible",
     updateNow: "Mettre à jour",
     updateLater: "Plus tard",
-    buildLabel: "Build n°"
+    buildLabel: "Build n°",
+    explore: "Clavier",
+    songs: "Mes morceaux",
+    addToSong: "Ajouter à un morceau",
+    navigation: "Vues"
   }
 };
 
-/** Chord qualities offered by the selector. */
-const chordTypes = ["maj","min","7","m7","maj7","dim","aug","sus2","sus4"];
 /** Scale types offered by the selector. */
 const scaleTypes = ["major","minor","harmonic minor","melodic minor","dorian","phrygian","lydian","mixolydian","locrian"];
 const scaleLabelsFr: Record<string, string> = {
@@ -88,7 +97,6 @@ const scaleLabelsFr: Record<string, string> = {
   "mixolydian": "mixolydien",
   "locrian": "locrien"
 };
-const rootNotes = ["C","C#","Db","D","D#","Eb","E","F","F#","Gb","G","G#","Ab","A","A#","Bb","B"];
 const zoomLevels = [0.7, 0.8, 0.9, 1, 1.2] as const;
 
 /**
@@ -99,8 +107,6 @@ export const App: React.FC = () => {
   const defaultKeyboard = keyboards.find(k => k.id === "image-3rangs") ?? keyboards[0];
   const [selectedKeyboard, setSelectedKeyboard] = useState<KeyboardDefinition>(defaultKeyboard);
   const [selectionMode, setSelectionMode] = useState<"chord" | "scale">("chord");
-  const [highlightNotes, setHighlightNotes] = useState<number[]>([]);
-  const [highlightLabels, setHighlightLabels] = useState<Record<number, string>>({});
   const [language, setLanguage] = useState<Language>("en");
   const [notation, setNotation] = useState<NoteNotation>("anglo");
   const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 520px)").matches;
@@ -113,6 +119,10 @@ export const App: React.FC = () => {
 
   const [fundamental, setFundamental] = useState("C");
   const [type, setType] = useState("maj");
+  const book = useSongbook();
+  const [view, setView] = useState<"keyboard" | "songs">("keyboard");
+  const [activeSongId, setActiveSongId] = useState<string | null>(null);
+  const [songDraft, setSongDraft] = useState<ChordSpec>({ root: "C", type: "maj" });
 
   const t = useMemo(() => translations[language], [language]);
 
@@ -120,46 +130,18 @@ export const App: React.FC = () => {
     registerServiceWorker({ onUpdate: setUpdateRegistration });
   }, []);
 
-  /**
-   * Compute the notes for the current chord or scale selection and store them
-   * without octave markers so the keyboard can highlight matching halves.
-   */
-  const applySelection = useCallback(() => {
-    let notes: string[] = [];
-    if (selectionMode === "chord") {
-      notes = Chord.get(`${fundamental}${type}`).notes;
-    } else {
-      notes = Scale.get(`${fundamental} ${type}`).notes;
+  const { highlightNotes, highlightLabels } = useMemo(
+    () => getSelectionHighlights(selectionMode, fundamental, type),
+    [selectionMode, fundamental, type]
+  );
+
+  // Reset only on a user mode switch, so restored preferences keep their type.
+  const changeMode = (mode: "chord" | "scale") => {
+    if (mode !== selectionMode) {
+      setSelectionMode(mode);
+      setType(mode === "chord" ? "maj" : "major");
     }
-    const normalized = notes
-      .map(toPitchClass)
-      .filter((pc): pc is number => pc !== undefined);
-
-    const labels: Record<number, string> = {};
-    notes.forEach(note => {
-      const pc = toPitchClass(note);
-      if (pc !== undefined) {
-        labels[pc] = note.replace(/[0-9]/g, ""); // keep accidental from current selection
-      }
-    });
-
-    setHighlightNotes(normalized);
-    setHighlightLabels(labels);
-  }, [fundamental, selectionMode, type]);
-
-  // Keep a sensible default type when switching modes
-  useEffect(() => {
-    if (selectionMode === "chord") {
-      setType("maj");
-    } else {
-      setType("major");
-    }
-  }, [selectionMode]);
-
-  // Apply the current selection automatically when inputs change
-  useEffect(() => {
-    applySelection();
-  }, [applySelection]);
+  };
 
   const selectionTypeLabel = selectionMode === "scale" && language === "fr"
     ? scaleLabelsFr[type] ?? type
@@ -270,7 +252,16 @@ export const App: React.FC = () => {
         </div>
       </header>
 
-      <section className="panel-card keyboard-card">
+      <nav className="app-navigation" aria-label={t.navigation}>
+        <button type="button" className={view === "keyboard" ? "active" : ""} aria-current={view === "keyboard" ? "page" : undefined} onClick={() => { setView("keyboard"); closeDrawer(); }}>{t.explore}</button>
+        <button type="button" className={view === "songs" ? "active" : ""} aria-current={view === "songs" ? "page" : undefined} onClick={() => { setView("songs"); closeDrawer(); }}>{t.songs}</button>
+        <button className="navigation-settings" type="button" aria-label={t.settings} onClick={() => openDrawer("settings")}>⚙︎</button>
+      </nav>
+
+      {view === "songs" ? (
+        <Songbook book={book} activeSongId={activeSongId} onActiveSongChange={setActiveSongId}
+          defaultKeyboardId={selectedKeyboard.id} initialChord={songDraft} language={language} notation={notation} />
+      ) : <section className="panel-card keyboard-card">
         <div className="keyboard-wrapper">
           <div className="keyboard-overlay">
             <button
@@ -306,14 +297,14 @@ export const App: React.FC = () => {
               <button
                 type="button"
                 className={`mode-button ${selectionMode === "chord" ? "active" : ""}`}
-                onClick={() => setSelectionMode("chord")}
+                onClick={() => changeMode("chord")}
               >
                 {t.chord}
               </button>
               <button
                 type="button"
                 className={`mode-button ${selectionMode === "scale" ? "active" : ""}`}
-                onClick={() => setSelectionMode("scale")}
+                onClick={() => changeMode("scale")}
               >
                 {t.scale}
               </button>
@@ -345,11 +336,20 @@ export const App: React.FC = () => {
             ⚙︎
           </button>
         </div>
-      </section>
+        {selectionMode === "chord" && <div className="keyboard-song-action">
+          <button className="song-button primary" type="button" onClick={() => {
+            setSongDraft({ root: fundamental, type });
+            setView("songs");
+            closeDrawer();
+          }}>+ {t.addToSong}</button>
+        </div>}
+      </section>}
 
       {drawerOpen && <div className="drawer-backdrop" onClick={closeDrawer} aria-hidden="true" />}
       <aside
         className={`side-drawer ${drawerOpen ? "open" : ""}`}
+        inert={!drawerOpen}
+        aria-hidden={!drawerOpen}
         role="dialog"
         aria-modal="true"
         aria-label={drawerView === "selection" ? (selectionMode === "chord" ? t.chord : t.scale) : t.settings}

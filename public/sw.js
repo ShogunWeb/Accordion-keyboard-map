@@ -84,11 +84,16 @@ self.addEventListener("fetch", (event) => {
       }
 
       return fetch(event.request).then((networkResponse) => {
-        const copy = networkResponse.clone();
-        caches
-          .open(CACHE_NAME)
-          .then((cache) => cache.put(event.request, copy))
-          .catch(() => {});
+        if (networkResponse.ok) {
+          const copy = networkResponse.clone();
+          // Keep the worker alive until on-demand assets (including PDF) are cached.
+          event.waitUntil(
+            caches
+              .open(CACHE_NAME)
+              .then((cache) => cache.put(event.request, copy))
+              .catch(() => {})
+          );
+        }
         return networkResponse;
       });
     })

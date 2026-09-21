@@ -1,0 +1,58 @@
+.songbook { display: flex; flex-direction: column; gap: 18px; }
+.songbook-heading, .song-sheet-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.songbook h2, .songbook h3, .songbook h4 { margin: 0; overflow-wrap: anywhere; }
+.songbook h2 { font-size: 1.5rem; }
+.songbook h3 { font-size: 1.15rem; }
+.songbook-subtitle { color: #64748b; font-size: .86rem; margin: 4px 0 0; }
+.song-button { border: 1px solid #cbd5e1; border-radius: 9px; background: white; color: #1e293b; padding: 9px 13px; min-height: 40px; font: inherit; font-size: .88rem; font-weight: 650; cursor: pointer; }
+.song-button.primary { background: #0284c7; border-color: #0284c7; color: white; }
+.song-button.danger { color: #b91c1c; }
+.song-button.icon { padding: 8px; min-width: 36px; }
+.song-button:hover:not(:disabled) { background: #f1f5f9; }
+.song-button.primary:hover:not(:disabled) { background: #0369a1; }
+.song-button:disabled { opacity: .5; cursor: default; }
+.song-button:focus-visible, .songbook input:focus-visible { outline: 2px solid #0284c7; outline-offset: 3px; }
+.songbook .field { min-width: 0; }
+.songbook .field input { width: 100%; border: 1px solid #d1d5db; border-radius: 10px; background: white; padding: 10px 12px; color: #0f172a; font: inherit; }
+.song-create { display: flex; flex-direction: column; gap: 12px; }
+.song-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.song-picker { max-width: 450px; }
+.song-details { display: flex; flex-direction: column; gap: 18px; }
+.song-metadata { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.chord-composer { border-left: 4px solid #0284c7; }
+.composer-fields { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.composer-fields .field { flex: 1; min-width: 115px; }
+.composer-fields > button { margin-bottom: 1px; }
+.song-notice { margin: 10px 0 0; color: #475569; font-size: .9rem; }
+.song-notice.error { margin: 0; border: 1px solid #fca5a5; border-radius: 10px; background: #fff7ed; color: #9a3412; padding: 12px; }
+.song-download { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; gap: 5px; }
+.song-download small { color: #64748b; font-size: .75rem; }
+.song-legend { display: flex; justify-content: center; gap: 20px; color: #475569; font-size: .85rem; }
+.song-legend span { display: inline-flex; align-items: center; gap: 7px; }
+.song-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 1px solid #64748b; }
+.push-swatch { background: #4a90e2; }
+.pull-swatch { background: #f5a623; }
+.song-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; align-items: start; }
+.song-chord-card { min-width: 0; padding: 14px 10px; }
+.song-chord-card.editing { border-color: #0284c7; box-shadow: 0 0 0 2px #bae6fd; }
+.chord-card-heading { display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 12px; }
+.chord-card-heading h4 { font-size: 1.5rem; }
+.chord-number { background: #f1f5f9; border-radius: 50%; color: #64748b; width: 25px; height: 25px; display: grid; place-items: center; font-size: .8rem; }
+.chord-card-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; margin-bottom: 16px; }
+.chord-card-actions .song-button { font-size: .75rem; padding: 6px 8px; }
+.song-keyboard { display: flex; justify-content: center; }
+.song-keyboard svg { display: block; flex-shrink: 0; }
+.song-empty { color: #64748b; margin: 0; }
+.song-delete { border-top: 1px solid #e2e8f0; padding-top: 18px; }
+.song-delete-confirm { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.song-delete-confirm p { margin: 0; flex: 1 1 250px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@media (max-width: 520px) {
+  .songbook-heading { align-items: start; }
+  .songbook-heading .song-button { max-width: 145px; }
+  .song-metadata { grid-template-columns: 1fr; }
+  .song-sheet-heading { align-items: start; flex-direction: column; }
+  .song-download { align-items: flex-start; }
+  .song-cards { grid-template-columns: minmax(0, 1fr); }
+  .composer-fields > button { flex-grow: 1; }
+}

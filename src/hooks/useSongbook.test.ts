@@ -5,6 +5,7 @@ import { keyboards } from "../data";
 import { SONGBOOK_STORAGE_KEY } from "../data/songs";
 import type { Song } from "../data/songs";
 import { useSongbook } from "./useSongbook";
+import { parseSongFile, serializeSongFile } from "../utils/songTransfer";
 
 const keyboardId = keyboards[0].id;
 const savedSong: Song = {
@@ -155,4 +156,45 @@ describe("useSongbook", () => {
     expect(result.current.songs).toEqual([savedSong]);
     expect(write).not.toHaveBeenCalled();
   });
+  it("imports copies atomically with fresh IDs and unique titles while preserving existing songs and settings", () => {
+    localStorage.setItem(SONGBOOK_STORAGE_KEY, payload([savedSong]));
+    localStorage.setItem("akm-settings", "keep settings");
+    const { result, unmount } = renderHook(useSongbook);
+    const write = vi.spyOn(Storage.prototype, "setItem");
+    const portable = parseSongFile(serializeSongFile([savedSong, savedSong]));
+    let imported!: Song[];
+    act(() => { imported = result.current.importSongs(portable); });
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(result.current.songs[0]).toEqual(savedSong);
+    expect(imported.map(song => song.title)).toEqual(["Autumn leaves (2)", "Autumn leaves (3)"]);
+    expect(new Set([savedSong.id, ...imported.map(song => song.id)]).size).toBe(3);
+    expect(new Set([savedSong.chords[0].id, ...imported.map(song => song.chords[0].id)]).size).toBe(3);
+    expect(localStorage.getItem("akm-settings")).toBe("keep settings");
+    unmount();
+    expect(renderHook(useSongbook).result.current.songs).toEqual([savedSong, ...imported]);
+  });
+
+  it("rejects an unresolved keyboard atomically and accepts an explicit replacement", () => {
+    localStorage.setItem(SONGBOOK_STORAGE_KEY, payload([savedSong]));
+    const { result } = renderHook(useSongbook);
+    const write = vi.spyOn(Storage.prototype, "setItem");
+    const incoming = [{ ...savedSong, keyboardId: "unknown" }];
+    expect(() => result.current.importSongs([savedSong, ...incoming])).toThrow();
+    expect(result.current.songs).toEqual([savedSong]);
+    expect(write).not.toHaveBeenCalled();
+    act(() => { result.current.importSongs(incoming.map(song => ({ ...song, keyboardId }))); });
+    expect(result.current.songs).toHaveLength(2);
+    expect(result.current.songs[1].keyboardId).toBe(keyboardId);
+  });
+
+  it("keeps an import in memory and preserves saved data if storage is full", () => {
+    localStorage.setItem(SONGBOOK_STORAGE_KEY, payload([savedSong]));
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new DOMException("Full", "QuotaExceededError"); });
+    const { result } = renderHook(useSongbook);
+    act(() => { result.current.importSongs([savedSong]); });
+    expect(result.current.songs).toHaveLength(2);
+    expect(result.current.storageError).toBe("quota");
+    expect(localStorage.getItem(SONGBOOK_STORAGE_KEY)).toBe(payload([savedSong]));
+  });
+
 });

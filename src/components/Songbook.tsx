@@ -6,10 +6,20 @@ import type { useSongbook } from "../hooks/useSongbook";
 import { chordTypes, formatChordName, getSelectionHighlights, rootNotes } from "../utils/musicUtils";
 import { formatNoteLabel } from "../utils/noteUtils";
 import type { NoteNotation } from "../utils/noteUtils";
+import { downloadSongFile, MAX_SONG_FILE_BYTES, parseSongFile, SongFileError } from "../utils/songTransfer";
+import type { PortableSong } from "../utils/songTransfer";
 import "./Songbook.css";
 
 const translations = {
   en: {
+    importFile: "Import songs", exportAll: "Export all songs", exportSong: "Export this song",
+    jsonHint: "JSON file · editable backup", reading: "Reading file…", importPreview: "Songs to import",
+    importHint: "Songs will be added to your library. Existing songs are kept; matching titles receive a numbered suffix.",
+    importConfirm: "Add these songs", importCount: "Songs added:", unknownKeyboard: "Choose a replacement for keyboard",
+    chooseKeyboard: "Choose a keyboard", invalidFile: "This is not a valid song file. Check the format, chords and duplicates.",
+    newerFile: "This file uses an unsupported format version. Update the app before importing it.",
+    emptyFile: "This file does not contain any songs.", largeFile: "The file is too large (maximum 2 MB). Export fewer songs at a time.",
+    readFailed: "The file could not be read. Please try again.", exportFailed: "The song file could not be downloaded. Please try again.",
     title: "My songs", saved: "Saved in this browser", newSong: "New song", songName: "Song title",
     namePlaceholder: "e.g. Autumn waltz", create: "Create song", cancel: "Cancel", selectSong: "Open a song",
     keyboard: "Keyboard for this song", empty: "Create a song to collect its chords and print their keyboards.",
@@ -29,6 +39,14 @@ const translations = {
     diminished: "Diminished", augmented: "Augmented", sus2: "Sus2", sus4: "Sus4"
   },
   fr: {
+    importFile: "Importer des morceaux", exportAll: "Tout exporter", exportSong: "Exporter ce morceau",
+    jsonHint: "Fichier JSON · sauvegarde modifiable", reading: "Lecture du fichier…", importPreview: "Morceaux à importer",
+    importHint: "Les morceaux seront ajoutés à votre bibliothèque. Les morceaux existants sont conservés ; les titres identiques reçoivent un numéro.",
+    importConfirm: "Ajouter ces morceaux", importCount: "Morceaux ajoutés :", unknownKeyboard: "Choisissez un remplaçant pour le clavier",
+    chooseKeyboard: "Choisir un clavier", invalidFile: "Ce fichier de morceaux est invalide. Vérifiez le format, les accords et les doublons.",
+    newerFile: "La version de ce format n’est pas prise en charge. Mettez l’application à jour avant de l’importer.",
+    emptyFile: "Ce fichier ne contient aucun morceau.", largeFile: "Le fichier est trop volumineux (maximum 2 Mo). Exportez moins de morceaux à la fois.",
+    readFailed: "Le fichier n’a pas pu être lu. Veuillez réessayer.", exportFailed: "Le fichier de morceaux n’a pas pu être téléchargé. Veuillez réessayer.",
     title: "Mes morceaux", saved: "Enregistrés dans ce navigateur", newSong: "Nouveau morceau", songName: "Titre du morceau",
     namePlaceholder: "Ex. Valse d’automne", create: "Créer le morceau", cancel: "Annuler", selectSong: "Ouvrir un morceau",
     keyboard: "Clavier de ce morceau", empty: "Créez un morceau pour rassembler ses accords et imprimer leurs claviers.",
@@ -66,7 +84,24 @@ export function Songbook({ book, activeSongId, onActiveSongChange, defaultKeyboa
   const t = translations[language];
   const [creating, setCreating] = useState(false);
   const [newTitle, setNewTitle] = useState("");
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [reading, setReading] = useState(false);
+  const [pendingImport, setPendingImport] = useState<PortableSong[] | null>(null);
+  const [replacements, setReplacements] = useState(new Map<string, string>());
+  const [transferError, setTransferError] = useState("");
+  const [transferStatus, setTransferStatus] = useState("");
   const song = book.songs.find(item => item.id === activeSongId) ?? book.songs[0];
+  const missingKeyboards = [...new Set((pendingImport ?? []).map(item => item.keyboardId))]
+    .filter(id => !keyboards.some(keyboard => keyboard.id === id));
+  const errorMessage = (error: unknown, fallback: string) => {
+    if (!(error instanceof SongFileError)) return fallback;
+    return { invalid: t.invalidFile, version: t.newerFile, empty: t.emptyFile, tooLarge: t.largeFile }[error.code];
+  };
+  const exportLibrary = () => {
+    setTransferError("");
+    try { downloadSongFile(book.songs); }
+    catch (error) { setTransferError(errorMessage(error, t.exportFailed)); }
+  };
   const storageMessage = book.storageError === "invalid" ? t.storageInvalid
     : book.storageError === "quota" ? t.storageQuota : t.storageUnavailable;
 
@@ -76,7 +111,61 @@ export function Songbook({ book, activeSongId, onActiveSongChange, defaultKeyboa
         <div><h2 id="songbook-title">{t.title}</h2><p className="songbook-subtitle">{t.saved}</p></div>
         {song && !creating && <button className="song-button" onClick={() => setCreating(true)}>+ {t.newSong}</button>}
       </div>
+      <div className="song-transfer-actions">
+        <button className="song-button" type="button" disabled={reading} onClick={() => fileInput.current?.click()}>
+          {reading ? t.reading : t.importFile}
+        </button>
+        <button className="song-button" type="button" disabled={!book.songs.length} onClick={exportLibrary}>{t.exportAll}</button>
+        <small>{t.jsonHint}</small>
+        <input ref={fileInput} type="file" accept=".json,application/json" hidden aria-label={t.importFile} onChange={async event => {
+          const file = event.target.files?.[0];
+          event.target.value = ""; // Allow choosing the same file again after a failed import.
+          if (!file) return;
+          setTransferError("");
+          setTransferStatus("");
+          setPendingImport(null);
+          setReplacements(new Map());
+          setReading(true);
+          try {
+            if (file.size > MAX_SONG_FILE_BYTES) throw new SongFileError("tooLarge");
+            setPendingImport(parseSongFile(await file.text()));
+          } catch (error) {
+            setTransferError(errorMessage(error, t.readFailed));
+          } finally {
+            setReading(false);
+          }
+        }} />
+      </div>
+      {transferError && <p className="song-notice error" role="alert">{transferError}</p>}
+      {transferStatus && <p className="song-notice" role="status">{transferStatus}</p>}
       {book.storageError && <p className="song-notice error" role="alert">{storageMessage}</p>}
+      {pendingImport && <section className="song-import-preview panel-card" aria-label={t.importPreview}>
+        <h3>{t.importPreview} ({pendingImport.length})</h3>
+        <p className="songbook-subtitle">{t.importHint}</p>
+        <ul className="song-import-list">{pendingImport.map((item, index) => <li key={index}>
+          <strong>{item.title}</strong> · {item.chords.length} {t.chordCount} · {keyboards.find(keyboard => keyboard.id === item.keyboardId)?.name ?? item.keyboardId}
+        </li>)}</ul>
+        {missingKeyboards.map(id => <label className="field" key={id}>
+          <span>{t.unknownKeyboard} « {id} »</span>
+          <select value={replacements.get(id) ?? ""} onChange={event => setReplacements(current => new Map(current).set(id, event.target.value))}>
+            <option value="">{t.chooseKeyboard}</option>
+            {keyboards.map(keyboard => <option key={keyboard.id} value={keyboard.id}>{keyboard.name}</option>)}
+          </select>
+        </label>)}
+        <div className="song-actions">
+          <button className="song-button primary" type="button" disabled={missingKeyboards.some(id => !replacements.get(id))} onClick={() => {
+            try {
+              const imported = book.importSongs(pendingImport.map(item => ({ ...item, keyboardId: replacements.get(item.keyboardId) ?? item.keyboardId })));
+              onActiveSongChange(imported[0].id);
+              setPendingImport(null);
+              setCreating(false);
+              setTransferStatus(`${t.importCount} ${imported.length}`);
+              setTransferError("");
+            } catch (error) { setTransferError(errorMessage(error, t.invalidFile)); }
+          }}>{t.importConfirm}</button>
+          <button className="song-button" type="button" onClick={() => setPendingImport(null)}>{t.cancel}</button>
+        </div>
+      </section>}
       {(creating || !song) && (
         <form className="song-create panel-card" onSubmit={event => {
           event.preventDefault();
@@ -117,6 +206,7 @@ function SongDetails({ song, book, initialChord, language, notation }: {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [pdfError, setPdfError] = useState(false);
+  const [fileError, setFileError] = useState("");
   const [announcement, setAnnouncement] = useState("");
   const cardsRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLFormElement>(null);
@@ -196,6 +286,11 @@ function SongDetails({ song, book, initialChord, language, notation }: {
       <div className="song-sheet-heading">
         <div><h3>{song.title}</h3><p className="songbook-subtitle">{song.chords.length} {t.chordCount}</p></div>
         <div className="song-download">
+          <button className="song-button" type="button" onClick={() => {
+            setFileError("");
+            try { downloadSongFile([song], song.title); }
+            catch (error) { setFileError(error instanceof SongFileError && error.code === "tooLarge" ? t.largeFile : t.exportFailed); }
+          }}>{t.exportSong}</button>
           <button className="song-button primary" disabled={!song.chords.length || !keyboard || exporting} onClick={downloadPdf}>
             {exporting ? t.exporting : t.download}
           </button>
@@ -203,6 +298,7 @@ function SongDetails({ song, book, initialChord, language, notation }: {
         </div>
       </div>
       {pdfError && <p className="song-notice error" role="alert">{t.pdfError}</p>}
+      {fileError && <p className="song-notice error" role="alert">{fileError}</p>}
       <p className="sr-only" role="status">{announcement}</p>
       {song.chords.length > 0 && keyboard && <div className="song-legend" aria-label={`${t.push} / ${t.pull}`}>
         <span><i className="push-swatch" />{t.push}</span><span><i className="pull-swatch" />{t.pull}</span>

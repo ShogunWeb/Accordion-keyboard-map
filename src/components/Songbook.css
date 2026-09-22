@@ -56,3 +56,10 @@
   .song-cards { grid-template-columns: minmax(0, 1fr); }
   .composer-fields > button { flex-grow: 1; }
 }
+
+.song-transfer-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.song-transfer-actions small { color: #64748b; font-size: .8rem; }
+.song-import-preview { display: flex; flex-direction: column; gap: 12px; border-color: #7dd3fc; }
+.song-import-list { margin: 0; padding-left: 22px; max-height: 240px; overflow-y: auto; overflow-wrap: anywhere; }
+.song-import-list li { padding: 4px 0; }
+.song-import-preview .field span { overflow-wrap: anywhere; }

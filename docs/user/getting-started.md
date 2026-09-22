@@ -82,6 +82,30 @@ To change or reset highlights:
 - Reload the page to clear all selections.
 
 
+## Backing up and sharing songs
+
+In **My songs**, use **Export this song** to download the selected song, or
+**Export all songs** to back up your library. The `.akm.json` file contains the
+song titles, ordered unique chords and associated keyboard models. It can be
+opened again for editing; **Download PDF** produces the separate printable sheet.
+
+To restore or transfer songs:
+
+1. Choose **Import songs** and select an exported `.akm.json` file.
+2. Review the songs in the preview. If a keyboard is unavailable, choose its
+   replacement; the app will recalculate the chord positions on that keyboard.
+3. Choose **Add these songs**. Existing songs are kept. Matching titles receive
+   a numbered suffix, so importing a file again creates additional copies.
+
+Songs stay in the browser's local storage. Keep the exported file to move them
+to another device or restore them after clearing site data. There is no automatic
+synchronization, and the file does not include custom keyboard definitions or
+chosen fingerings. Importing does not change your display preferences.
+
+Files are limited to 2 MB. Invalid or unsupported files are rejected before any
+songs are added. If the browser cannot save imported changes, a warning appears;
+export those songs before closing the page.
+
 ## Tips for Practice
 
 - Use scale mode to explore where the notes of a key live on your keyboard  

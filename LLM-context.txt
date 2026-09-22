@@ -70,6 +70,9 @@ src/
   components/
     AccordionKeyboard.tsx      # SVG layout, pitch-class matching and note labels
     AccordionKeyboard.test.tsx
+    ChordReferenceButton.tsx   # 12-page chord reference action and transient SVG snapshots
+    ChordReferenceButton.css
+    ChordReferenceButton.test.tsx
     Songbook.tsx               # library, chord editor/cards, local translations, PDF action
     Songbook.css
     Songbook.test.tsx           # import preview, confirmation/remapping and export scopes
@@ -87,6 +90,7 @@ src/
       image-3rangs.keyboard.ts # id "image-3rangs" — Serafini 3-row, Darwin bass system (app's default keyboard)
   utils/
     noteUtils.ts               # toPitchClass(), formatNoteLabel() (anglo/fr)
+    chordReference.ts          # 12 chromatic roots × maj/min/7/m7, localized headings
     musicUtils.ts              # shared selectors, getSelectionHighlights(), formatChordName()
     musicUtils.test.ts
     songTransfer.ts            # versioned JSON song exchange, validation and download
@@ -266,7 +270,20 @@ type Song = {
 - API: `exportSongPdf({ title, keyboardName, cards: [{ label, svg }], language })`.
   The exporter creates the document entirely in the browser and downloads a
   sanitized filename derived from the song title; nothing is sent to a backend.
-- Vector A4 landscape with an automatic single-row layout, up to four full
+- The same API alternatively accepts `pages: [{ title, cards: [{ label, svg }] }]`
+  instead of `cards`. Explicit groups must contain 1–4 keyboards and each occupies
+  one page, with its own heading; the maximum group size fixes the column width.
+  These pages scale keyboards as necessary to preserve grouping.
+- `ChordReferenceButton.tsx`, below the explorer keyboard in both chord/scale
+  modes, downloads a complete reference: 12 landscape pages, four full keyboards
+  per root (major, minor, dominant 7th, minor 7th). `chordReference.ts` chooses
+  C, Db, D, Eb, E, F, F#, G, Ab, A, Bb, B without enharmonic duplicates.
+  It uses the selected keyboard, language and notation, shared music helpers
+  and `AccordionKeyboard`. On click, a transient hidden React render is flushed
+  synchronously, its 48 SVGs cloned, then removed; only then is the exporter
+  dynamically loaded. Settings are captured before awaiting, the button is
+  disabled while busy, and errors allow retry. No library/settings writes.
+- Song PDFs use vector A4 landscape with an automatic single-row layout, up to four full
   keyboards per page. Header height is measured first (including wrapped titles).
   The widest SVG aspect ratio, fitted to the remaining height, determines how
   many columns fit the available width and gaps. Wider keyboards get three,
@@ -274,7 +291,7 @@ type Song = {
   fit four per page; SVG viewBox proportions, not screen zoom, drive this choice.
 - Layout constants in exportSongPdf.ts: 12 mm margins, 8 mm gaps, maximum four
   columns. Incomplete final rows are centered with the same keyboard scale as
-  previous pages; keyboards are never split. Every page includes song title,
+  previous pages; keyboards are never split. Every page includes song title (or explicit group heading),
   keyboard name, push/pull legend, chord labels, and page number.
 - SVG clones use explicit Helvetica and fixed dimensions derived from viewBox;
   responsive screen styles are removed. The screen SVGs are not modified.
@@ -343,7 +360,7 @@ type Song = {
 - `src/components/Songbook.test.tsx` — 3 UI integration tests: import preview and
   confirmation, unknown keyboard mapping, cancellation/invalid files, export
   scopes. JSON file download is mocked in these tests.
-- `src/utils/exportSongPdf.test.ts` — 11 tests: landscape page dimensions,
+- `src/utils/exportSongPdf.test.ts` — 14 tests: explicit 12-page groups (including wide SVGs), invalid groups, landscape page dimensions,
   adaptive columns for narrow/wide/mixed SVGs, proportions and page bounds,
   no overlaps/blank pages, centering of partial rows without scale changes,
   independence from screen zoom, long titles, source SVG preservation, filenames.
@@ -355,7 +372,10 @@ type Song = {
   arbitrary JS bundle now that lazy chunks exist. Expected version format is
   `YYYYMMDD-HHMM-NNNN`, including when `AKM_BUILD_VERSION` is set.
 - Vitest setup: `src/setupTests.ts`, jsdom, matchMedia stub, jest-dom matchers.
-- Baseline reviewed on 2026-09-22: 61 tests pass in 7 files. Lint and production
+- `src/components/ChordReferenceButton.test.tsx` — 2 integration tests: full
+  48-keyboard output, note highlighting across all roots/qualities, localized
+  headings, settings snapshot, busy state and error recovery.
+- Baseline reviewed on 2026-09-22: 66 tests pass in 8 files. Lint and production
   build pass; build reports outdated Browserslist data (nonfatal).
 - Browser check on 2026-09-22: downloaded a PDF through Songbook in Chromium
   from the dev server with seven chords on the Serafini keyboard, French note
@@ -422,6 +442,9 @@ a browser:
   layouts. Check automatic column counts, centered partial final rows, every
   button/note, French accents, long titles, sharp/flat spellings, page breaks,
   and readable print size.
+- Download the full chord reference for different layouts and notations:
+  12 landscape pages, correct root headings, exactly four complete keyboards
+  (maj/min/7/m7) each, unchanged explorer settings and song library.
 - Check that the PDF module is not fetched on initial load; export once online,
   reload offline, and retry. Also test a first offline export without a cached
   exporter and confirm a useful error rather than a stuck download button.

@@ -14,7 +14,7 @@ function keyboardSvg(width = 235, height = 734) {
   return svg;
 }
 
-async function captureExport(sources: SVGSVGElement[], title = "Valse d’automne") {
+async function captureExport(sources: SVGSVGElement[], title = "Valse d’automne", grouped = false) {
   const rendered: Array<{ page: number; x: number; y: number; width: number; height: number }> = [];
   let generatedPdf: jsPDF | undefined;
   const save = vi.fn().mockResolvedValue(undefined);
@@ -33,7 +33,12 @@ async function captureExport(sources: SVGSVGElement[], title = "Valse d’automn
   await exportSongPdf({
     title,
     keyboardName: "Séráfini 3 rangs - basses Darwin",
-    cards: sources.map((svg, index) => ({ label: `Accord ${index + 1}`, svg })),
+    ...(grouped ? {
+      pages: Array.from({ length: sources.length / 4 }, (_, page) => ({
+        title: `Famille ${page + 1}`,
+        cards: sources.slice(page * 4, page * 4 + 4).map(svg => ({ label: "Accord", svg })),
+      })),
+    } : { cards: sources.map((svg, index) => ({ label: `Accord ${index + 1}`, svg })) }),
     language: "fr",
   });
   const pageWidth = generatedPdf!.internal.pageSize.getWidth();
@@ -54,7 +59,7 @@ async function captureExport(sources: SVGSVGElement[], title = "Valse d’automn
   }
   expect(save).toHaveBeenCalledOnce();
   expect(save.mock.calls[0][0]).toMatch(/^[a-zA-Z0-9._-]+\.pdf$/);
-  return { rendered, pageWidth, pageCount: generatedPdf!.getNumberOfPages() };
+  return { rendered, pageWidth, pageCount: generatedPdf!.getNumberOfPages(), output: generatedPdf!.output() };
 }
 
 describe("exportSongPdf landscape layout", () => {
@@ -97,5 +102,22 @@ describe("exportSongPdf landscape layout", () => {
   it.each([1, 2, 3, 4, 8])("exports %i narrow keyboards without blank pages", async count => {
     const { pageCount } = await captureExport(Array(count).fill(keyboardSvg()));
     expect(pageCount).toBe(Math.ceil(count / 4));
+  });
+});
+
+describe("explicit chord reference pages", () => {
+  it.each([235, 1400])("keeps four keyboards on each of 12 pages even at width %i", async width => {
+    const { rendered, pageCount } = await captureExport(Array.from({ length: 48 }, () => keyboardSvg(width)), "Recueil", true);
+    expect(pageCount).toBe(12);
+    expect(rendered.map(card => card.page)).toEqual(Array.from({ length: 48 }, (_, index) => Math.floor(index / 4) + 1));
+  });
+
+  it("rejects empty or overfull explicit pages before downloading", async () => {
+    for (const count of [0, 5]) {
+      await expect(exportSongPdf({
+        title: "Recueil", keyboardName: "Test", language: "fr",
+        pages: [{ title: "Do", cards: Array.from({ length: count }, () => ({ label: "Do", svg: keyboardSvg() })) }],
+      })).rejects.toThrow("between one and four");
+    }
   });
 });

@@ -1,12 +1,19 @@
 import { jsPDF } from "jspdf";
 import { svg2pdf } from "svg2pdf.js";
 
-export interface SongPdfOptions {
+export interface PdfCard {
+  label: string;
+  svg: SVGSVGElement;
+}
+
+export type SongPdfOptions = {
   title: string;
   keyboardName: string;
-  cards: Array<{ label: string; svg: SVGSVGElement }>;
   language: "en" | "fr";
-}
+} & (
+  | { cards: PdfCard[]; pages?: never }
+  | { pages: Array<{ title: string; cards: PdfCard[] }>; cards?: never }
+);
 
 const MARGIN = 12;
 const CARD_GAP = 8;
@@ -78,8 +85,12 @@ function prepareSvg(source: SVGSVGElement) {
  * Download a vector A4 landscape sheet with aspect-ratio-based pagination. Import this module on demand so the PDF
  * dependencies are separate from the application's initial JavaScript bundle.
  */
-export async function exportSongPdf({ title, keyboardName, cards, language }: SongPdfOptions): Promise<void> {
-  if (cards.length === 0) {
+export async function exportSongPdf({ title, keyboardName, cards, pages, language }: SongPdfOptions): Promise<void> {
+  if (pages && (pages.length === 0 || pages.some(page => page.cards.length === 0 || page.cards.length > MAX_CARDS_PER_PAGE))) {
+    throw new Error("Explicit PDF pages must contain between one and four keyboards.");
+  }
+  const allCards = pages ? pages.flatMap(page => page.cards) : cards!;
+  if (allCards.length === 0) {
     throw new Error("Add at least one chord before exporting a song.");
   }
 
@@ -96,9 +107,11 @@ export async function exportSongPdf({ title, keyboardName, cards, language }: So
   // Measure the shared header once so long titles also affect available space.
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(15);
+  const pageTitleLines = pages?.map(page => limitedLines(pdf, page.title, contentWidth, 2));
   const titleLines = limitedLines(pdf, songTitle, contentWidth, 2);
+  const maxTitleLines = pageTitleLines ? Math.max(...pageTitleLines.map(lines => lines.length)) : titleLines.length;
   const titleY = 14;
-  const keyboardY = titleY + (titleLines.length - 1) * 6 + 5;
+  const keyboardY = titleY + (maxTitleLines - 1) * 6 + 5;
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(9);
   const keyboardLines = limitedLines(pdf, keyboardName, contentWidth, 2);
@@ -107,24 +120,34 @@ export async function exportSongPdf({ title, keyboardName, cards, language }: So
   const svgY = labelY + 10; // Room for two lines of chord name.
   const maxSvgHeight = pageHeight - MARGIN - 5 - svgY;
 
-  const preparedCards = cards.map(card => ({ label: card.label, ...prepareSvg(card.svg) }));
+  const preparedCards = allCards.map(card => ({ label: card.label, ...prepareSvg(card.svg) }));
   // Fit to the usable height first. Never shrink keyboards further merely to
   // squeeze in another column; use the widest aspect ratio for a stable layout.
   const widestAtFullHeight = Math.max(...preparedCards.map(card => maxSvgHeight * card.width / card.height));
-  const cardsPerPage = Math.max(1, Math.min(
+  // Explicit pages keep chord families together, scaling down if necessary.
+  const cardsPerPage = pages ? Math.max(...pages.map(page => page.cards.length)) : Math.max(1, Math.min(
     MAX_CARDS_PER_PAGE,
-    cards.length,
+    allCards.length,
     Math.floor((contentWidth + CARD_GAP) / (widestAtFullHeight + CARD_GAP))
   ));
   const cardWidth = (contentWidth - CARD_GAP * (cardsPerPage - 1)) / cardsPerPage;
-  const pageCount = Math.ceil(cards.length / cardsPerPage);
+  let offset = 0;
+  const preparedPages = pages
+    ? pages.map(page => {
+      const group = preparedCards.slice(offset, offset + page.cards.length);
+      offset += page.cards.length;
+      return group;
+    })
+    : Array.from({ length: Math.ceil(allCards.length / cardsPerPage) }, (_, index) =>
+      preparedCards.slice(index * cardsPerPage, (index + 1) * cardsPerPage));
+  const pageCount = preparedPages.length;
 
   for (let page = 0; page < pageCount; page++) {
     if (page > 0) pdf.addPage();
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(15);
     pdf.setTextColor(25, 35, 45);
-    titleLines.forEach((line, index) => pdf.text(line, pageWidth / 2, titleY + index * 6, { align: "center" }));
+    (pageTitleLines?.[page] ?? titleLines).forEach((line, index) => pdf.text(line, pageWidth / 2, titleY + index * 6, { align: "center" }));
 
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(9);
@@ -142,7 +165,7 @@ export async function exportSongPdf({ title, keyboardName, cards, language }: So
     pdf.rect(legendX + 5 + pushWidth + 9, y - 2.5, 3, 3, "F");
     pdf.text(pullLabel, legendX + 5 + pushWidth + 9 + 5, y);
 
-    const pageCards = preparedCards.slice(page * cardsPerPage, (page + 1) * cardsPerPage);
+    const pageCards = preparedPages[page];
     // Keep the same scale on the last page and center any partial group.
     const groupWidth = pageCards.length * cardWidth + (pageCards.length - 1) * CARD_GAP;
     const groupX = (pageWidth - groupWidth) / 2;

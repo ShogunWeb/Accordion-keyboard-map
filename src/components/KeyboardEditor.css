@@ -34,3 +34,17 @@
 @media (max-width: 520px) {
   .app-navigation button { padding: 10px 8px; font-size: .82rem; }
 }
+
+.compact-editor { padding-bottom: 88px; }
+.editor-mobile-tools { display: flex; flex-direction: column; gap: 10px; }
+.editor-row-picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.editor-row-picker [aria-pressed="true"] { border-color: #0284c7; background: #e0f2fe; color: #0369a1; }
+.compact-editor .song-button, .compact-editor input, .compact-editor select { min-height: 44px; }
+.compact-editor input, .compact-editor select { font-size: 16px; }
+.compact-editor .editor-workspace { grid-template-columns: minmax(0, 1fr); }
+.compact-editor .editor-row { width: 100%; }
+.compact-editor .editor-preview { position: static; grid-row: 1; }
+.compact-editor .editor-preview svg { max-height: 360px; width: auto; }
+.editor-save-bar { position: fixed; z-index: 5; bottom: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); background: #fff; border-top: 1px solid #cbd5e1; box-shadow: 0 -4px 16px #0f172a0d; }
+.editor-save-bar span { min-width: 0; font-size: .75rem; color: #475569; }
+.editor-save-bar button { flex-shrink: 0; }

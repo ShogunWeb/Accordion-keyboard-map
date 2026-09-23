@@ -371,22 +371,6 @@
   text-align: center;
 }
 
-.settings-fab {
-  position: absolute;
-  bottom: 30px;
-  right: 10px;
-  width: 54px;
-  height: 54px;
-  border-radius: 50%;
-  border: none;
-  background: #0ea5e9;
-  color: white;
-  font-size: 1.4rem;
-  font-weight: 800;
-  box-shadow: 0 12px 24px rgba(14, 165, 233, 0.35);
-  cursor: pointer;
-  z-index: 10;
-}
 
 .legend-text {
   font-size: 0.95rem;
@@ -579,3 +563,40 @@
 .app-navigation button:focus-visible { outline: 2px solid #0284c7; outline-offset: 1px; }
 .app-navigation .navigation-settings { margin-left: auto; }
 .keyboard-song-action { display: flex; justify-content: center; padding: 12px 0; }
+
+/* Compact layouts keep navigation and secondary actions out of the drawing. */
+.mobile-view-header { display: flex; justify-content: flex-end; }
+.mobile-control { border: 1px solid #cbd5e1; border-radius: 12px; background: #fff; color: #0f172a; min-height: 44px; min-width: 44px; padding: 8px; font: inherit; font-size: .85rem; font-weight: 650; cursor: pointer; }
+.mobile-control.primary { color: #fff; background: #0284c7; border-color: #0284c7; }
+.mobile-control[aria-pressed="true"] { color: #0369a1; border-color: #7dd3fc; background: #e0f2fe; }
+.mobile-control:disabled { opacity: .45; cursor: default; }
+.mobile-control:focus-visible, .mobile-keyboard-stage:focus-visible { outline: 2px solid #0284c7; outline-offset: -2px; }
+.mobile-keyboard { display: grid; grid-template-columns: minmax(0, 1fr) 108px; gap: 6px; height: calc(100vh - 16px); height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); min-height: 0; }
+.mobile-keyboard-stage { min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; border-radius: 12px; background: linear-gradient(180deg, #f8fafc, #eef2f7); }
+.mobile-keyboard-canvas { width: calc(100% * var(--keyboard-zoom, 1)); height: calc(100% * var(--keyboard-zoom, 1)); }
+.mobile-keyboard-canvas > svg { display: block; width: 100%; height: 100% !important; max-width: none !important; }
+.mobile-keyboard-controls { display: flex; flex-direction: column; gap: 6px; min-height: 0; overflow-y: auto; }
+.mobile-keyboard-controls > * { flex-shrink: 0; }
+.mobile-selection { overflow-wrap: anywhere; line-height: 1.35; }
+.mobile-zoom { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.mobile-zoom button { font-size: 1.1rem; }
+.mobile-legend { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 4px 6px; font-size: .75rem; color: #475569; }
+.mobile-legend span { display: flex; align-items: center; gap: 6px; }
+.mobile-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; border: 1px solid #64748b; }
+.drawer-navigation { display: flex; flex-direction: column; gap: 12px; }
+.drawer-navigation button { text-align: left; min-height: 44px; }
+.drawer-navigation button[aria-current="page"] { color: #0369a1; background: #e0f2fe; }
+.drawer-close { min-width: 44px; min-height: 44px; }
+.drawer-content { display: block; }
+.side-drawer { height: 100dvh; }
+
+@media (max-width: 520px), (max-width: 900px) and (max-height: 480px) {
+  .top-bar { display: none; }
+  .app-shell.compact-explorer { padding: calc(8px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left)); gap: 0; }
+  .compact-explorer .keyboard-card { min-width: 0; }
+  .side-drawer { left: auto; right: 0; width: min(100%, 360px); max-width: none; padding-bottom: env(safe-area-inset-bottom); }
+  .side-drawer .toggle-option, .side-drawer .song-button, .side-drawer select { min-height: 44px; }
+  .side-drawer select, .side-drawer textarea { font-size: 16px; }
+  .side-drawer input[type="checkbox"] { width: 24px; height: 24px; }
+  .side-drawer .checkbox-field { min-height: 48px; }
+}

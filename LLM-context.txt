@@ -2,7 +2,7 @@
 
 This file summarizes the project to give an LLM quick context before it
 starts working on this application. Reviewed against source code on
-2026-09-23 (keyboard editor and documentation review). Treat the code and
+2026-09-23 (compact mobile layout and documentation review). Treat the code and
 configuration as the source of truth; re-validate this summary when they change.
 
 ## 1. Overview
@@ -63,12 +63,15 @@ from the committed `package-lock.json`.
 src/
   main.tsx                     # React entry point
   App.tsx                      # explorer/song/editor views, preferences, shared libraries, i18n
+  App.mobile.test.tsx          # compact navigation, selection, zoom, editor and focus tests
   App.css                      # application styles, imported by App.tsx
   styles.css                   # global styles, imported by main.tsx
   index.css                    # unused starter stylesheet (not imported)
   buildInfo.ts                 # exposes buildVersion (injected at build time, see vite.config.ts)
   serviceWorker.ts             # SW registration + update handling
   components/
+    MobileKeyboard.tsx         # fitted mobile explorer, independent manual zoom
+    Drawer.tsx                 # modal focus, Escape, backdrop, scroll locking
     AccordionKeyboard.tsx      # SVG layout, pitch-class matching and note labels
     AccordionKeyboard.test.tsx
     ChordReferenceButton.tsx   # 12-page chord reference action and transient SVG snapshots
@@ -81,6 +84,7 @@ src/
     Songbook.css
     Songbook.test.tsx           # import preview, confirmation/remapping and export scopes
   hooks/
+    useCompactLayout.ts        # responsive query with resize/orientation listener
     useKeyboards.ts             # synchronous custom catalog loading, explicit saves/imports
     useKeyboards.test.ts
     useSongbook.ts              # library state and persistence, CRUD, duplicate prevention
@@ -170,6 +174,9 @@ No need to touch a central file.
   shared SVG preview, save/use/copy, and single/all JSON export. It stays mounted
   while hidden to keep drafts across navigation. Nonempty row/button removal and
   abandoning drafts require confirmation. Dirty drafts register an unload warning.
+  Compact mode shows one selected row, preserves the other draft rows, collapses
+  the preview/library controls, and provides a fixed Save bar. Reducing row count
+  clamps the active row so a removed row cannot leave the editor blank.
 - Portable JSON: `{ format: "accordion-keyboard-map/keyboards", version: 1,
   keyboards: [...] }`, max 256 KiB, with full definitions and stable IDs. Imports
   preview before confirmation; malformed records reject the entire file. Free IDs
@@ -184,8 +191,8 @@ No need to touch a central file.
 
 - Main state: selected keyboard, mode (`chord`/`scale`), root note,
   chord/scale type, language (`en`/`fr`), notation (`anglo`/`fr` = Do Re Mi),
-  zoom level, legend visibility, side drawer open state (view "selection" or
-  "settings"). Additional session state: view (`keyboard`/`songs`/`keyboards`), active
+  desktop zoom level, legend visibility, side drawer open state (views "selection",
+  "settings", "navigation", "actions"). Additional session state: view (`keyboard`/`songs`/`keyboards`), active
   song ID, and draft chord passed from the keyboard to the song editor.
 - `getSelectionHighlights(mode, root, type)` in `src/utils/musicUtils.ts`
   calls Tonal.js's `Chord.get()` or `Scale.get()`, normalizes notes to chroma
@@ -208,16 +215,40 @@ No need to touch a central file.
   `keyboardId`, `language`, `notation`, `fundamental`, `type`, `selectionMode`,
   `zoomIndex`, `showLegend`. Check restoration after reload when changing
   initialization or mode handling. Custom keyboard selection restoration has an
-  App integration test; broader mode/language/zoom preference restoration is not
-  covered. Songbook persistence is separate (see §8).
+  App integration test; mobile tests also cover restored mode/type and separation
+  from desktop zoom. Broader language/notation preference restoration is not covered. Songbook persistence is separate (see §8).
 - User feedback: text form that opens a `mailto:` link to
   accordion@shogunweb.be.
 - "Source code" link to the GitHub repo in the Settings panel.
 - Navigation switches between Keyboard, My songs and My keyboards without a
-  router. Settings are available in all three views; the closed drawer is inert
-  and aria-hidden.
+  router. Desktop uses tabs; compact mode exposes navigation and Settings through
+  Menu. `Drawer` mounts only while open, marks the background main content inert,
+  locks body scrolling, contains keyboard focus and restores it on close. Escape,
+  the close button and backdrop dismiss it. Selection combines chord/scale mode,
+  root, localized type labels and Done in one panel.
 - In chord mode, "Add to a song" opens My songs with the current chord
   preselected. The user still chooses/creates the target song and clicks Add.
+
+### Compact mobile explorer
+
+- `useCompactLayout()` follows `(max-width: 520px), (max-width: 900px) and
+  (max-height: 480px)`, including small phones in landscape. It subscribes to
+  media-query changes; CSS uses the same breakpoint.
+- `MobileKeyboard` replaces the desktop explorer controls with a two-column layout:
+  drawing plus a 108 px rail containing Menu, current chord/scale, zoom, Fit to
+  screen, More actions and optional legend. Navigation consumes no row above it.
+- The drawing uses the shared SVG at scale 1, fitting its viewBox proportionally
+  inside a viewport based on `100dvh`, with a `100vh` fallback and safe-area padding.
+  Global body/root minimum heights also use dynamic viewport units.
+- Manual zoom enlarges the canvas from 1× to 2.5× in 0.25 steps. Only the drawing
+  scrolls; Fit resets zoom and both scroll offsets. It starts fitted on mount or
+  keyboard change and does not overwrite the stored desktop zoom preference.
+- More actions hosts Add to a song (chord mode), the legend checkbox and the same
+  lazy PDF reference component. Desktop retains the tab bar and original zoom.
+  The duplicate floating Settings button was removed.
+- Mobile controls have at least 44×44 CSS px targets. Settings/select inputs and
+  compact editor inputs use 16 px text. The drawing may require manual zoom to
+  read fine labels on very small screens; fit mode prioritizes seeing every key.
 
 ## 7. SVG rendering (AccordionKeyboard.tsx)
 
@@ -232,7 +263,7 @@ No need to touch a central file.
 - Positioning: columns = rows (right → left), vertical position computed from
   `position = bIdx * buttonSpacingY + (offsetY * buttonSize) / 2`, then
   `y = verticalPadding + (maxPos - position) + buttonRadius` to draw bottom → top.
-- `scale` (prop) drives a responsive button size (zoomLevels in App.tsx:
+- `scale` (prop) drives desktop button size (zoomLevels in App.tsx:
   `[0.7, 0.8, 0.9, 1, 1.2]`).
 
 ## 8. Saved songs (Songbook / useSongbook)
@@ -342,7 +373,7 @@ type Song = {
   fonts cover French accents; unsupported characters in headings become `?`.
 - The download button is disabled for an empty song, missing keyboard, or export
   in progress. Failures produce an error message and allow another attempt.
-- Reference production build: initial JS ~84 KB gzip, exporter ~153 KB gzip
+- Reference production build: initial JS ~86 KB gzip, exporter ~153 KB gzip
   (sizes vary with changes). Optional jsPDF chunks may appear in dist without
   being needed by the SVG export path; inspect actual network requests before
   claiming their download cost.
@@ -446,6 +477,16 @@ type Song = {
   persisted definitions; verified saved edits update song rendering. Desktop and
   mobile (390/320 px) had no horizontal overflow or browser errors. Screenshots
   were reviewed. These checks do not establish offline or cross-browser behavior.
+- Mobile layout validation on 2026-09-23: lint/build and 99 tests pass in 12 files.
+  `src/App.mobile.test.tsx` adds 6 integration cases for fitting/manual zoom,
+  restored musical selection, modal focus/Escape, secondary actions/PDF generation,
+  compact row editing and responsive layout changes.
+- Mobile Chromium check on 2026-09-23 against production preview: no clipped
+  buttons/labels or document overflow at 375×550, 375×667, 320×480 and 667×375,
+  including a custom 3×14 layout with offsets +3/0/−3. Fit follows height changes;
+  manual zoom/reset, menu/focus, selection, compact editing, JSON persistence and
+  real reference PDF download pass. Screenshots reviewed; no browser errors.
+  These are emulated viewports, not a physical iPhone or Safari/WebKit validation.
 - No committed browser end-to-end suite. Broader App interaction coverage and
   production/offline PDF behavior remain unverified; successful JSON transfer
   checks do not establish those.
@@ -519,6 +560,10 @@ a browser:
 - Export/import keyboards into a fresh and an existing catalog; check preserved
   IDs versus collision copies. Import dependent songs afterward and verify PDF
   output. A failed keyboard save must retain the draft and the old saved catalog.
+- Check compact view at 375×550 and 320×480, plus landscape/desktop transitions:
+  all keys fit by default, controls stay outside the drawing, zoom scrolls only
+  the drawing and Fit resets it. Exercise Menu, musical selection, actions/PDF,
+  modal focus/Escape, and editing different rows without losing notes.
 - For PWA changes, use preview to check offline loading after assets are cached,
   then a second build with a new version to check the update prompt and reload.
 

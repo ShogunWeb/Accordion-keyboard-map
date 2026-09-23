@@ -10,6 +10,7 @@ import "./KeyboardEditor.css";
 const translations = {
   en: {
     title: "My keyboards", subtitle: "Create a 2 or 3 row keyboard, with 5 to 14 buttons per row.",
+    library: "Choose or import a keyboard", editRow: "Row to edit", showPreview: "Show preview", hidePreview: "Hide preview",
     new: "Blank keyboard", template: "Starting keyboard", copy: "Create a copy", copySuffix: "copy",
     open: "Edit a saved keyboard", choose: "Choose a keyboard", name: "Keyboard name", rows: "Number of rows",
     row: "Row", right: "right", middle: "middle", left: "left", count: "Buttons", offset: "Vertical offset",
@@ -33,6 +34,7 @@ const translations = {
   },
   fr: {
     title: "Mes claviers", subtitle: "Créez un clavier de 2 ou 3 rangs, avec 5 à 14 touches par rang.",
+    library: "Choisir ou importer un clavier", editRow: "Rang à modifier", showPreview: "Afficher l’aperçu", hidePreview: "Masquer l’aperçu",
     new: "Clavier vierge", template: "Clavier de départ", copy: "Créer une copie", copySuffix: "copie",
     open: "Modifier un clavier enregistré", choose: "Choisir un clavier", name: "Nom du clavier", rows: "Nombre de rangs",
     row: "Rang", right: "droite", middle: "milieu", left: "gauche", count: "Touches", offset: "Décalage vertical",
@@ -57,8 +59,8 @@ const translations = {
 };
 
 type Library = ReturnType<typeof useKeyboards>;
-export function KeyboardEditor({ library, language, notation, selectedKeyboardId, onUse }: {
-  library: Library; language: "en" | "fr"; notation: NoteNotation; selectedKeyboardId: string; onUse: (id: string) => void;
+export function KeyboardEditor({ library, language, notation, selectedKeyboardId, onUse, compact = false }: {
+  compact?: boolean; library: Library; language: "en" | "fr"; notation: NoteNotation; selectedKeyboardId: string; onUse: (id: string) => void;
 }) {
   const t = translations[language];
   const [draft, setDraft] = useState<KeyboardDefinition | null>(null);
@@ -68,6 +70,14 @@ export function KeyboardEditor({ library, language, notation, selectedKeyboardId
   const [status, setStatus] = useState("");
   const [reading, setReading] = useState(false);
   const [pending, setPending] = useState<KeyboardDefinition[] | null>(null);
+  const [activeRow, setActiveRow] = useState(0);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const visibleRow = Math.min(activeRow, (draft?.rows.length ?? 1) - 1);
+  const notice = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (compact && error) notice.current?.scrollIntoView?.({ block: "center" });
+  }, [compact, error]);
   const fileInput = useRef<HTMLInputElement>(null);
   const dirty = draft !== null && JSON.stringify(draft) !== baseline;
   const saved = library.customKeyboards.find(k => k.id === draft?.id);
@@ -85,6 +95,7 @@ export function KeyboardEditor({ library, language, notation, selectedKeyboardId
     if (dirty && !window.confirm(t.discard)) return;
     const next = structuredClone(keyboard);
     setDraft(next);
+    setActiveRow(0); setPreviewOpen(false); setLibraryOpen(false);
     setBaseline(isSaved ? JSON.stringify(next) : "");
     setError(""); setStatus("");
   }
@@ -101,9 +112,10 @@ export function KeyboardEditor({ library, language, notation, selectedKeyboardId
     catch { setError(t.exportError); }
   }
 
-  return <section className="keyboard-editor" aria-labelledby="keyboard-editor-title">
+  return <section className={`keyboard-editor ${compact ? "compact-editor" : ""}`} aria-labelledby="keyboard-editor-title">
     <div><h2 id="keyboard-editor-title">{t.title}</h2><p className="songbook-subtitle">{t.subtitle}</p></div>
-    <div className="panel-card editor-library">
+    {compact && draft && <button className="song-button" type="button" aria-expanded={libraryOpen} aria-controls="editor-library" onClick={() => setLibraryOpen(open => !open)}>{t.library}</button>}
+    {(!compact || !draft || libraryOpen) && <div className="panel-card editor-library" id="editor-library">
       <p className="songbook-subtitle">{t.empty}</p>
       <div className="editor-start">
         <button type="button" className="song-button" onClick={() => open({ id: newKeyboardId(), name: "", rows: [blankRow(0, 11), blankRow(1, 10)] })}>+ {t.new}</button>
@@ -135,9 +147,9 @@ export function KeyboardEditor({ library, language, notation, selectedKeyboardId
           finally { setReading(false); }
         }} />
       </div>
-    </div>
+    </div>}
     {library.storageError && <p className="song-notice error" role="alert">{storageMessage}</p>}
-    {error && <p className="song-notice error" role="alert">{error}</p>}
+    {error && <p ref={notice} className="song-notice error" role="alert">{error}</p>}
     {status && <p className="song-notice" role="status">{status}</p>}
     {pending && <section className="panel-card editor-library" aria-label={t.importPreview}>
       <h3>{t.importPreview}</h3><p className="songbook-subtitle">{t.importHint}</p>
@@ -167,7 +179,7 @@ export function KeyboardEditor({ library, language, notation, selectedKeyboardId
         <p className="songbook-subtitle">{t.orientation}</p><p className="songbook-subtitle">{t.notesHint}</p>
         {saved && <p className="songbook-subtitle">{t.editHint}</p>}
         <div className="song-actions">
-          <button type="submit" className="song-button primary">{t.save}</button>
+          {!compact && <button type="submit" className="song-button primary">{t.save}</button>}
           <button type="button" className="song-button" disabled={!saved || dirty} onClick={() => onUse(saved!.id)}>{t.use}</button>
           <button type="button" className="song-button" onClick={() => { const keyboard = validDraft(); if (keyboard) exportKeyboards([keyboard]); }}>{t.export}</button>
           <button type="button" className="song-button" disabled={!dirty} onClick={() => {
@@ -177,9 +189,17 @@ export function KeyboardEditor({ library, language, notation, selectedKeyboardId
         </div>
         {dirty && <p className="songbook-subtitle">{t.dirty}</p>}
       </div>
+      {compact && <div className="editor-mobile-tools">
+        <div className="editor-row-picker" role="group" aria-label={t.editRow}>
+          {draft.rows.map((_, index) => <button key={index} className="song-button" type="button" aria-pressed={visibleRow === index}
+            onClick={() => setActiveRow(index)}>{t.row} {index + 1}</button>)}
+        </div>
+        <button className="song-button" type="button" aria-expanded={previewOpen} aria-controls="editor-preview"
+          onClick={() => setPreviewOpen(open => !open)}>{previewOpen ? t.hidePreview : t.showPreview}</button>
+      </div>}
       <div className="editor-workspace">
         <div className="editor-rows">
-          {draft.rows.map((row, rowIndex) => <fieldset className="panel-card editor-row" key={rowIndex}>
+          {draft.rows.map((row, rowIndex) => compact && rowIndex !== visibleRow ? null : <fieldset className="panel-card editor-row" key={rowIndex}>
             <legend>{t.row} {rowIndex + 1} · {rowIndex === 0 ? t.right : rowIndex === draft.rows.length - 1 ? t.left : t.middle}</legend>
             <label className="field"><span>{t.count} — {t.row} {rowIndex + 1}</span><select value={row.buttons.length} onChange={e => {
               const count = Number(e.target.value);
@@ -204,11 +224,15 @@ export function KeyboardEditor({ library, language, notation, selectedKeyboardId
             </table>
           </fieldset>).reverse()}
         </div>
-        <aside className="panel-card editor-preview" aria-label={t.preview}>
+        {(!compact || previewOpen) && <aside id="editor-preview" className="panel-card editor-preview" aria-label={t.preview}>
           <h3>{t.preview}</h3><p className="songbook-subtitle">{t.push} / {t.pull}</p>
           <AccordionKeyboard rows={draft.rows.map(row => ({ ...row, buttons: row.buttons.map(b => ({ ...b, push: normalizeKeyboardNote(b.push) ?? "", pull: normalizeKeyboardNote(b.pull) ?? "" })) }))} notation={notation} scale={0.7} />
-        </aside>
+        </aside>}
       </div>
+      {compact && <div className="editor-save-bar">
+        <span>{library.storageError ? t.storageWrite : dirty ? t.dirty : t.saved}</span>
+        <button type="submit" className="song-button primary">{t.save}</button>
+      </div>}
     </form>}
   </section>;
 }

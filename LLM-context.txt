@@ -2,8 +2,8 @@
 
 This file summarizes the project to give an LLM quick context before it
 starts working on this application. Reviewed against source code on
-2026-09-23 (keyboard editor integration). Treat the code and configuration as the source of truth;
-re-validate this summary when they change.
+2026-09-23 (keyboard editor and documentation review). Treat the code and
+configuration as the source of truth; re-validate this summary when they change.
 
 ## 1. Overview
 
@@ -27,8 +27,8 @@ licensed under AGPLv3+. Local features may not yet be deployed.
 ## 2. Tech stack
 
 - React 19 + TypeScript, build/dev via Vite 7
-- Styling uses plain CSS in `src/styles.css`, `src/App.css`, and
-  `src/components/Songbook.css`.
+- Styling uses plain CSS in `src/styles.css`, `src/App.css`, and component
+  stylesheets (`Songbook.css`, `KeyboardEditor.css`, `ChordReferenceButton.css`).
   Tailwind CSS 4 is installed and configured via `@tailwindcss/postcss`, but
   the CSS entry point does not import Tailwind or include its directives.
 - Tonal.js (`tonal`) for music theory (chords/scales/pitch class)
@@ -62,7 +62,7 @@ from the committed `package-lock.json`.
 ```
 src/
   main.tsx                     # React entry point
-  App.tsx                      # keyboard/song views, UI preferences, songbook hook, i18n
+  App.tsx                      # explorer/song/editor views, preferences, shared libraries, i18n
   App.css                      # application styles, imported by App.tsx
   styles.css                   # global styles, imported by main.tsx
   index.css                    # unused starter stylesheet (not imported)
@@ -140,10 +140,12 @@ type ButtonLayout = { index: number; push: string; pull: string };
   (quincunx) layout of diatonic accordions. Positive offsets move a row upward.
 - `push`/`pull`: note on push/pull, e.g. `"C4"`, `"F#"`, `"Bb4"`, or `""` if
   unknown. Store notes using letter names and ASCII accidentals (`#`, `b`);
-  French notation is an output format, not a data-entry convention. The
-  helpers do not explicitly normalize French input or Unicode accidentals.
+  Built-in source files use this canonical form directly. Custom editor/import
+  input may use French names or Unicode accidentals: `normalizeKeyboardNote()`
+  in `data/customKeyboards.ts` converts them before saving. The display helpers
+  in `utils/noteUtils.ts` expect canonical stored notes.
 
-To add a keyboard: create `src/data/keyboards/my-keyboard.keyboard.ts` with a
+To add a built-in keyboard: create `src/data/keyboards/my-keyboard.keyboard.ts` with a
 default export of type `KeyboardDefinition`; it's auto-loaded by
 `import.meta.glob` in `data/index.ts`, sorted alphabetically by `name` in the
 selector. Use a unique, stable `id` (also used in saved preferences).
@@ -197,20 +199,23 @@ No need to touch a central file.
   there is no Apply button. `changeMode()` resets the type to `maj`/`major`
   only when the user switches modes; loading saved preferences no longer
   triggers a mode-reset effect that would overwrite the saved type.
-- i18n: separate `en`/`fr` dictionaries in `App.tsx` and `Songbook.tsx`
-  (no i18n library). PDF headings/legend also have English/French text.
+- i18n: separate `en`/`fr` dictionaries in App, Songbook, KeyboardEditor and
+  ChordReferenceButton (no i18n library). PDF headings/legend also have
+  English/French text.
   Language is inferred from the browser when no preferences are saved.
   UI language and note notation remain independent global preferences.
 - Persistence: `localStorage` under the `akm-settings` key, with fields
   `keyboardId`, `language`, `notation`, `fundamental`, `type`, `selectionMode`,
   `zoomIndex`, `showLegend`. Check restoration after reload when changing
-  initialization or mode handling; Custom keyboard selection restoration has an App integration test; broader
-  mode/language/zoom preference restoration is not covered. Songbook persistence is separate (see §8).
+  initialization or mode handling. Custom keyboard selection restoration has an
+  App integration test; broader mode/language/zoom preference restoration is not
+  covered. Songbook persistence is separate (see §8).
 - User feedback: text form that opens a `mailto:` link to
   accordion@shogunweb.be.
 - "Source code" link to the GitHub repo in the Settings panel.
-- Navigation switches between Keyboard, My songs and My keyboards without a router. Settings
-  are available in both views; the closed drawer is inert and aria-hidden.
+- Navigation switches between Keyboard, My songs and My keyboards without a
+  router. Settings are available in all three views; the closed drawer is inert
+  and aria-hidden.
 - In chord mode, "Add to a song" opens My songs with the current chord
   preselected. The user still chooses/creates the target song and clicks Add.
 
@@ -366,7 +371,8 @@ type Song = {
   `src/buildInfo.ts` and shown in the Settings panel ("Build n° ...").
 - `vite.config.ts` sets `base: "/Accordion-keyboard-map/"` — important for the
   GitHub Pages deployment (subpath). Adjust if deployed elsewhere (OVH, root,
-  etc.).
+  etc.); also update `start_url` and `scope` in `public/manifest.webmanifest`
+  to match the new deployment path.
 - `manifest.webmanifest`: name "Diatonic Keyboard", `display: standalone`,
   icons 192/512/512-maskable/180.
 - Use `npm run build` rather than invoking `vite build` directly, so the
@@ -380,8 +386,8 @@ type Song = {
 `.github/workflows/deploy.yml` (single "CI and Deploy" workflow):
 - On push/PR/workflow_dispatch: checkout, Node 20, `npm ci`, `npm run build`,
   `npm test`.
-- On push to `main` (not a PR): uploads `dist/` as a Pages artifact, then a
-  `deploy` job publishes to GitHub Pages via `actions/deploy-pages`.
+- On non-PR runs targeting `main` (push or workflow_dispatch): uploads `dist/`
+  as a Pages artifact, then a `deploy` job publishes to GitHub Pages via `actions/deploy-pages`.
 - Lint is not currently part of this workflow; run it locally.
 
 ## 12. Existing tests and validation status
@@ -413,6 +419,13 @@ type Song = {
 - `src/components/ChordReferenceButton.test.tsx` — 2 integration tests: full
   48-keyboard output, note highlighting across all roots/qualities, localized
   headings, settings snapshot, busy state and error recovery.
+- `src/data/customKeyboards.test.ts` — 16 tests: layout/note validation, limits,
+  JSON round trips, duplicate IDs, versions and file size rejection.
+- `src/hooks/useKeyboards.test.ts` — 7 tests: synchronous loading, stable edits,
+  additive imports, storage errors and custom keyboard references in songs.
+- `src/components/KeyboardEditor.test.tsx` — 4 App integration tests: allowed
+  row/count/offset choices, note validation, selection restoration, draft protection,
+  import preview/cancellation/collisions and retry after failed saves.
 - Keyboard editor validation on 2026-09-23: 93 tests pass in 11 files, including
   27 new cases for layout/file validation, storage failures, custom song references,
   editor limits, draft protection, imports and restored custom selection.
@@ -442,11 +455,11 @@ type Song = {
 - `docs/dev/contributing.md` still references the older
   `src/data/keyboards.ts` (single-file) structure — **outdated**, the actual
   code uses `src/data/keyboards/*.keyboard.ts` (one file per keyboard).
-- README's structure tree also contains obsolete paths. `architecture.md`
-  describes Tailwind directives absent from the CSS and suggests adding
-  persistence that already exists. Its normalization guidance and that in
+- `docs/dev/architecture.md` describes Tailwind directives absent from the CSS
+  and suggests adding persistence that already exists. Its normalization guidance and that in
   `data-model.md` are partly aspirational: actual helpers are `toPitchClass`
-  and `formatNoteLabel` in `src/utils/noteUtils.ts`, not `utils/notes.ts`.
+  and `formatNoteLabel` in `src/utils/noteUtils.ts`, plus `normalizeKeyboardNote`
+  in `src/data/customKeyboards.ts`, not `utils/notes.ts`.
   Prefer source code/configuration when documentation disagrees.
 - No handling of the left-hand (bass) keyboard — noted as a future extension
   in `docs/dev/architecture.md`.
@@ -500,6 +513,12 @@ a browser:
 - Export one/all songs and import into an empty and an existing library; check
   order, keyboard, names, fresh IDs, cancellation and invalid files. Resolve an
   unknown keyboard explicitly and reload to confirm the mapped song persists.
+- Create/copy/edit custom keyboards with 2 and 3 rows, 5 and 14 buttons per row,
+  and offsets −3/+3. Check French/English input, invalid notes, preview and saved
+  selection after reload. Confirm cancellation when removing populated buttons.
+- Export/import keyboards into a fresh and an existing catalog; check preserved
+  IDs versus collision copies. Import dependent songs afterward and verify PDF
+  output. A failed keyboard save must retain the draft and the old saved catalog.
 - For PWA changes, use preview to check offline loading after assets are cached,
   then a second build with a new version to check the update prompt and reload.
 
@@ -508,8 +527,9 @@ a browser:
 - Read the relevant source before editing; this file is a starting map.
 - Preserve the data conventions in §5, chroma-based matching, and the separate
   language/notation settings when changing musical or display behavior.
-- Keep English/French entries in sync in both App and Songbook, and update PDF
-  text when relevant. Language and note notation are independent.
+- Keep English/French entries in sync in App, Songbook, KeyboardEditor and
+  ChordReferenceButton, and update PDF text when relevant. Language and note
+  notation are independent.
 - Use the shared music helpers and existing SVG renderer for new chord views.
   Preserve per-song keyboard IDs, stable chord IDs, and duplicate rules.
 - Treat stored song data as user content: version schema changes and preserve

@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "./App.css";
 import { AccordionKeyboard } from "./components/AccordionKeyboard";
-import { keyboards } from "./data";
-import type { KeyboardDefinition } from "./data";
+import { useKeyboards } from "./hooks/useKeyboards";
+import { KeyboardEditor } from "./components/KeyboardEditor";
 import favicon from "/favicon.svg";
 import { formatNoteLabel } from "./utils/noteUtils";
 import { chordTypes, getSelectionHighlights, rootNotes } from "./utils/musicUtils";
@@ -48,6 +48,7 @@ const translations: Record<Language, Record<string, string>> = {
     buildLabel: "Build",
     explore: "Keyboard",
     songs: "My songs",
+    keyboards: "My keyboards",
     addToSong: "Add to a song",
     navigation: "Views"
   },
@@ -80,6 +81,7 @@ const translations: Record<Language, Record<string, string>> = {
     buildLabel: "Build n°",
     explore: "Clavier",
     songs: "Mes morceaux",
+    keyboards: "Mes claviers",
     addToSong: "Ajouter à un morceau",
     navigation: "Vues"
   }
@@ -105,8 +107,17 @@ const zoomLevels = [0.7, 0.8, 0.9, 1, 1.2] as const;
  * to the chosen chord or scale.
  */
 export const App: React.FC = () => {
+  const keyboardLibrary = useKeyboards();
+  const { keyboards } = keyboardLibrary;
   const defaultKeyboard = keyboards.find(k => k.id === "image-3rangs") ?? keyboards[0];
-  const [selectedKeyboard, setSelectedKeyboard] = useState<KeyboardDefinition>(defaultKeyboard);
+  const [selectedKeyboardId, setSelectedKeyboardId] = useState(() => {
+    try {
+      const id: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null")?.keyboardId;
+      if (keyboards.some(k => k.id === id)) return id as string;
+    } catch { /* Keep the default if saved preferences cannot be read. */ }
+    return defaultKeyboard.id;
+  });
+  const selectedKeyboard = keyboards.find(k => k.id === selectedKeyboardId) ?? defaultKeyboard;
   const [selectionMode, setSelectionMode] = useState<"chord" | "scale">("chord");
   const [language, setLanguage] = useState<Language>("en");
   const [notation, setNotation] = useState<NoteNotation>("anglo");
@@ -120,8 +131,8 @@ export const App: React.FC = () => {
 
   const [fundamental, setFundamental] = useState("C");
   const [type, setType] = useState("maj");
-  const book = useSongbook();
-  const [view, setView] = useState<"keyboard" | "songs">("keyboard");
+  const book = useSongbook(keyboards);
+  const [view, setView] = useState<"keyboard" | "songs" | "keyboards">("keyboard");
   const [activeSongId, setActiveSongId] = useState<string | null>(null);
   const [songDraft, setSongDraft] = useState<ChordSpec>({ root: "C", type: "maj" });
 
@@ -188,10 +199,6 @@ export const App: React.FC = () => {
           const clamped = Math.min(Math.max(0, parsed.zoomIndex), zoomLevels.length - 1);
           setZoomIndex(clamped);
         }
-        if (parsed.keyboardId) {
-          const kb = keyboards.find(k => k.id === parsed.keyboardId);
-          if (kb) setSelectedKeyboard(kb);
-        }
         if (typeof parsed.showLegend === "boolean") {
           setShowLegend(parsed.showLegend);
         }
@@ -256,13 +263,18 @@ export const App: React.FC = () => {
       <nav className="app-navigation" aria-label={t.navigation}>
         <button type="button" className={view === "keyboard" ? "active" : ""} aria-current={view === "keyboard" ? "page" : undefined} onClick={() => { setView("keyboard"); closeDrawer(); }}>{t.explore}</button>
         <button type="button" className={view === "songs" ? "active" : ""} aria-current={view === "songs" ? "page" : undefined} onClick={() => { setView("songs"); closeDrawer(); }}>{t.songs}</button>
+        <button type="button" className={view === "keyboards" ? "active" : ""} aria-current={view === "keyboards" ? "page" : undefined} onClick={() => { setView("keyboards"); closeDrawer(); }}>{t.keyboards}</button>
         <button className="navigation-settings" type="button" aria-label={t.settings} onClick={() => openDrawer("settings")}>⚙︎</button>
       </nav>
 
+      <div hidden={view !== "keyboards"}>
+        <KeyboardEditor library={keyboardLibrary} language={language} notation={notation} selectedKeyboardId={selectedKeyboard.id}
+          onUse={id => { setSelectedKeyboardId(id); setView("keyboard"); }} />
+      </div>
       {view === "songs" ? (
-        <Songbook book={book} activeSongId={activeSongId} onActiveSongChange={setActiveSongId}
+        <Songbook keyboards={keyboards} book={book} activeSongId={activeSongId} onActiveSongChange={setActiveSongId}
           defaultKeyboardId={selectedKeyboard.id} initialChord={songDraft} language={language} notation={notation} />
-      ) : <section className="panel-card keyboard-card">
+      ) : view === "keyboard" ? <section className="panel-card keyboard-card">
         <div className="keyboard-wrapper">
           <div className="keyboard-overlay">
             <button
@@ -345,7 +357,7 @@ export const App: React.FC = () => {
           }}>+ {t.addToSong}</button>
         </div>}
         <ChordReferenceButton keyboard={selectedKeyboard} language={language} notation={notation} />
-      </section>}
+      </section> : null}
 
       {drawerOpen && <div className="drawer-backdrop" onClick={closeDrawer} aria-hidden="true" />}
       <aside
@@ -395,7 +407,7 @@ export const App: React.FC = () => {
                   value={selectedKeyboard.id}
                   onChange={e => {
                     const kb = keyboards.find(k => k.id === e.target.value);
-                    if (kb) setSelectedKeyboard(kb);
+                    if (kb) setSelectedKeyboardId(kb.id);
                   }}
                 >
                   {keyboards.map(k => (

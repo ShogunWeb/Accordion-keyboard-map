@@ -1,4 +1,5 @@
 import { keyboards } from "./index";
+import type { KeyboardDefinition } from "./types";
 import { chordTypes, rootNotes } from "../utils/musicUtils";
 
 export interface ChordSpec {
@@ -43,7 +44,7 @@ export function sameChord(a: ChordSpec, b: ChordSpec): boolean {
  * Validate the complete versioned payload before using any of it. Unknown
  * versions or malformed records must not silently replace the user's library.
  */
-export function parseSongbook(raw: string): Song[] {
+export function parseSongbook(raw: string, availableKeyboards: readonly KeyboardDefinition[] = keyboards): Song[] {
   const payload: unknown = JSON.parse(raw);
   if (!isRecord(payload) || payload.version !== SONGBOOK_VERSION || !Array.isArray(payload.songs)) {
     throw new Error("Invalid songbook format");
@@ -52,7 +53,7 @@ export function parseSongbook(raw: string): Song[] {
   return payload.songs.map((value: unknown) => {
     if (!isRecord(value) || !isNonemptyString(value.id) || songIds.has(value.id)
       || !isNonemptyString(value.title) || typeof value.keyboardId !== "string"
-      || !keyboards.some(keyboard => keyboard.id === value.keyboardId) || !Array.isArray(value.chords)) {
+      || !availableKeyboards.some(keyboard => keyboard.id === value.keyboardId) || !Array.isArray(value.chords)) {
       throw new Error("Invalid song");
     }
     songIds.add(value.id);

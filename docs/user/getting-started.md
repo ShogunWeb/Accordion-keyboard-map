@@ -36,8 +36,8 @@ Then open the URL printed in the terminal (usually `http://localhost:5173`).
 
 ## Choosing a Keyboard Layout
 
-1. Use the **Keyboard** selector at the top  
-2. Choose one of the built‑in right‑hand layouts  
+1. Open **Settings** and use the **Keyboard** selector
+2. Choose a built-in or saved custom right-hand layout
 3. The keyboard display updates immediately  
 
 Each button displays:
@@ -55,7 +55,7 @@ Each button displays:
 2. Select:
    - **Root note** (C, D, E, F#, …)
    - **Type** (maj, min, 7, major, dorian, …)
-3. Click **Apply**
+3. The highlights update automatically.
 
 Highlighted notes:
 
@@ -78,9 +78,39 @@ The legend below the keyboard explains the color scheme (normal vs highlighted s
 
 To change or reset highlights:
 
-- Select another chord/scale and click **Apply**, or  
-- Reload the page to clear all selections.
+- Select another chord or scale; highlights update automatically.
+- Your last selection is restored when you reload the page.
 
+
+## Creating your own keyboard
+
+Open **My keyboards** (**Mes claviers** in French), then choose **Blank keyboard**
+or select a starting layout and **Create a copy**. Built-in models stay unchanged.
+
+1. Name the keyboard and choose **2 or 3 rows**.
+2. Choose **5 to 14 buttons per row** and adjust each row's vertical offset in
+   half-button units, from −3 to +3. A positive offset moves the row up.
+3. Enter each button's **Push** and **Pull** notes. English (`C`, `F#4`, `Bb3`)
+   and French (`Do`, `Fa#4`, `Sib3`) input are accepted. Octave 0–8 is optional;
+   leave a note blank if unknown. Invalid notes are marked in red.
+4. Check the live preview. Row 1 is on the right; button 1 is at the bottom.
+5. Choose **Save keyboard**, then **Use this keyboard** to explore its chords
+   and scales. It is also available in song selectors and PDF exports.
+
+To edit it later, choose it under **Edit a saved keyboard**. Saving also updates
+existing songs using that layout. Drafts survive switching views, but are not
+saved when closing the app. Removing buttons containing notes asks for confirmation.
+
+Use **Export this keyboard** for the current draft or **Export all keyboards**
+for the saved custom library. **Import keyboards** previews the JSON file before
+**Add these keyboards** saves it. Existing layouts are kept; collisions create
+copies. Files are limited to 256 KB.
+
+Keyboards and songs have separate JSON exports. On another device, import the
+keyboard file first, then the song file. If a song refers to an unavailable ID,
+choose its replacement in the song import preview. Keep both exports as backups:
+clearing browser data removes the saved library. A storage error keeps the draft
+available for export or another save attempt.
 
 ## Downloading a complete chord reference
 

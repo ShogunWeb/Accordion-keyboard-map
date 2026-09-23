@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { AccordionKeyboard } from "./AccordionKeyboard";
-import { keyboards } from "../data";
+import { keyboards as builtInKeyboards } from "../data";
+import type { KeyboardDefinition } from "../data";
 import type { ChordSpec, Song } from "../data/songs";
 import type { useSongbook } from "../hooks/useSongbook";
 import { chordTypes, formatChordName, getSelectionHighlights, rootNotes } from "../utils/musicUtils";
@@ -70,6 +71,7 @@ const translations = {
 type Language = keyof typeof translations;
 type SongbookState = ReturnType<typeof useSongbook>;
 interface SongbookProps {
+  keyboards?: readonly KeyboardDefinition[];
   book: SongbookState;
   activeSongId: string | null;
   onActiveSongChange: (id: string) => void;
@@ -80,7 +82,7 @@ interface SongbookProps {
 }
 
 /** Saved song library. Song state lives in App so unsaved data survives view changes. */
-export function Songbook({ book, activeSongId, onActiveSongChange, defaultKeyboardId, initialChord, language, notation }: SongbookProps) {
+export function Songbook({ keyboards = builtInKeyboards, book, activeSongId, onActiveSongChange, defaultKeyboardId, initialChord, language, notation }: SongbookProps) {
   const t = translations[language];
   const [creating, setCreating] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -191,13 +193,14 @@ export function Songbook({ book, activeSongId, onActiveSongChange, defaultKeyboa
             {book.songs.map(item => <option value={item.id} key={item.id}>{item.title}</option>)}
           </select>
         </label>
-        <SongDetails key={song.id} song={song} book={book} initialChord={initialChord} language={language} notation={notation} />
+        <SongDetails keyboards={keyboards} key={song.id} song={song} book={book} initialChord={initialChord} language={language} notation={notation} />
       </>}
     </section>
   );
 }
 
-function SongDetails({ song, book, initialChord, language, notation }: {
+function SongDetails({ keyboards, song, book, initialChord, language, notation }: {
+  keyboards: readonly KeyboardDefinition[];
   song: Song; book: SongbookState; initialChord: ChordSpec; language: Language; notation: NoteNotation;
 }) {
   const t = translations[language];

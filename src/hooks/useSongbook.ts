@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
-import { keyboards } from "../data";
+import { keyboards as builtInKeyboards } from "../data";
+import type { KeyboardDefinition } from "../data";
 import { isChordSpec, parseSongbook, sameChord, SONGBOOK_STORAGE_KEY, SONGBOOK_VERSION } from "../data/songs";
 import type { ChordSpec, Song, SongbookStorageError } from "../data/songs";
 import type { PortableSong } from "../utils/songTransfer";
@@ -11,7 +12,7 @@ interface SongbookState {
 }
 
 /** Read synchronously before any mutation; mounting never writes to storage. */
-function readSongbook(): SongbookState {
+function readSongbook(keyboards: readonly KeyboardDefinition[]): SongbookState {
   let raw: string | null;
   try {
     raw = window.localStorage.getItem(SONGBOOK_STORAGE_KEY);
@@ -20,7 +21,7 @@ function readSongbook(): SongbookState {
   }
   if (raw === null) return { songs: [], storageError: null, writable: true };
   try {
-    return { songs: parseSongbook(raw), storageError: null, writable: true };
+    return { songs: parseSongbook(raw, keyboards), storageError: null, writable: true };
   } catch {
     return { songs: [], storageError: "invalid", writable: false };
   }
@@ -31,8 +32,8 @@ function createId(): string {
 }
 
 /** Saved song sheets are independent of the current keyboard preferences. */
-export function useSongbook() {
-  const [state, setState] = useState<SongbookState>(readSongbook);
+export function useSongbook(keyboards: readonly KeyboardDefinition[] = builtInKeyboards) {
+  const [state, setState] = useState<SongbookState>(() => readSongbook(keyboards));
   const stateRef = useRef(state);
 
   // Persist in the action itself, never inside a React state updater/effect.
@@ -76,7 +77,7 @@ export function useSongbook() {
     };
     changeSongs(songs => [...songs, song]);
     return song;
-  }, [changeSongs]);
+  }, [changeSongs, keyboards]);
 
   const renameSong = useCallback((id: string, title: string) => {
     const trimmed = title.trim();
@@ -87,7 +88,7 @@ export function useSongbook() {
   const setSongKeyboard = useCallback((id: string, keyboardId: string) => {
     if (!keyboards.some(keyboard => keyboard.id === keyboardId)) return;
     changeSong(id, song => song.keyboardId === keyboardId ? song : { ...song, keyboardId });
-  }, [changeSong]);
+  }, [changeSong, keyboards]);
 
   const addChord = useCallback((songId: string, spec: ChordSpec) => {
     if (!isChordSpec(spec)) return;
@@ -143,10 +144,10 @@ export function useSongbook() {
       };
     });
     // Revalidate at the mutation boundary (including resolved keyboard IDs).
-    parseSongbook(JSON.stringify({ version: SONGBOOK_VERSION, songs: imported }));
+    parseSongbook(JSON.stringify({ version: SONGBOOK_VERSION, songs: imported }), keyboards);
     if (imported.length) changeSongs(songs => [...songs, ...imported]);
     return imported;
-  }, [changeSongs]);
+  }, [changeSongs, keyboards]);
 
   return {
     songs: state.songs,

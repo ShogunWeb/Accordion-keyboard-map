@@ -30,6 +30,21 @@ update automatically when the selection changes. Each button shows the push note
 on its left half and the pull note on its right half; selected notes are blue
 (push) or orange (pull).
 
+### Small screens
+
+On phones, the explorer fits the entire keyboard to the available screen height.
+The **Menu** button opens navigation and Settings. Tap the current chord/scale to
+choose its mode, root and type, then **Done** to return to the keyboard.
+
+Use **+ / −** to enlarge the drawing and scroll within it; **Fit to screen**
+restores the full view. **More actions (⋯)** contains Add to a song, the legend
+switch and the chord reference PDF. The compact layout follows screen resizing
+and also supports small phones in landscape.
+
+In the keyboard editor, choose **Row 1 / 2 / 3** to edit one row at a time.
+**Show preview** opens the complete layout, and the Save button stays at the
+bottom of the screen. Switching rows preserves all entered notes.
+
 ### Custom keyboards
 
 Open **My keyboards** to start with a blank layout or copy an existing model.
@@ -122,11 +137,13 @@ Accordion-keyboard-map/
 │  ├─ App.css, styles.css        # Application/global styles
 │  ├─ buildInfo.ts, serviceWorker.ts
 │  ├─ components/
+│  │  ├─ MobileKeyboard.tsx      # Fit-to-screen explorer and manual zoom
+│  │  ├─ Drawer.tsx              # Modal panels and focus management
 │  │  ├─ AccordionKeyboard.tsx   # SVG renderer
 │  │  ├─ KeyboardEditor.tsx      # Custom layouts, preview and JSON exchange
 │  │  ├─ Songbook.tsx            # Song library and chord sheets
 │  │  └─ ChordReferenceButton.tsx
-│  ├─ hooks/                    # useKeyboards and useSongbook persistence
+│  ├─ hooks/                    # Library persistence and compact-layout detection
 │  ├─ data/
 │  │  ├─ index.ts, types.ts      # Built-in loader and shared keyboard types
 │  │  ├─ keyboards/             # One *.keyboard.ts file per built-in layout

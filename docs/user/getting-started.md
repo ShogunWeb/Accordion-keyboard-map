@@ -34,9 +34,28 @@ npm run dev
 Then open the URL printed in the terminal (usually `http://localhost:5173`).
 
 
+## Using a small screen
+
+On a phone, the keyboard fills the available height automatically. A compact
+column beside it contains the controls:
+
+- **Menu**: open Keyboard, My songs, My keyboards or Settings.
+- **Current chord/scale**: choose Chord or Scale, its root and type, then tap
+  **Done**. Highlights update immediately while choosing.
+- **+ / −**: enlarge the keyboard to read the notes, then scroll inside the drawing.
+- **Fit to screen**: return to the complete keyboard and reset its scroll position.
+- **⋯ (More actions)**: add the chord to a song, show/hide the legend, or download
+  the complete chord reference PDF.
+
+The fitted drawing follows changes in available height, including browser bars
+and device rotation. It starts fitted when opening a keyboard; desktop zoom is
+kept separately. Larger zoom makes the notes easier to read, with scrolling inside
+the keyboard. Settings and selection panels close with their close button, by
+tapping outside, or with Escape when using a physical keyboard.
+
 ## Choosing a Keyboard Layout
 
-1. Open **Settings** and use the **Keyboard** selector
+1. Open **Settings** (through **Menu** on a phone) and use the **Keyboard** selector
 2. Choose a built-in or saved custom right-hand layout
 3. The keyboard display updates immediately  
 
@@ -97,6 +116,11 @@ or select a starting layout and **Create a copy**. Built-in models stay unchange
 5. Choose **Save keyboard**, then **Use this keyboard** to explore its chords
    and scales. It is also available in song selectors and PDF exports.
 
+On a phone, the editor shows one row at a time: choose **Row 1**, **Row 2** or
+**Row 3**. Other rows retain their notes. **Show preview** reveals the complete
+keyboard; **Save keyboard** remains available at the bottom. When a draft is
+open, **Choose or import a keyboard** expands the library controls.
+
 To edit it later, choose it under **Edit a saved keyboard**. Saving also updates
 existing songs using that layout. Drafts survive switching views, but are not
 saved when closing the app. Removing buttons containing notes asks for confirmation.
@@ -115,7 +139,8 @@ available for export or another save attempt.
 ## Downloading a complete chord reference
 
 In the **Keyboard** view, select your keyboard and note notation in **Settings**,
-then use **Download chord reference (PDF)** below the keyboard.
+then use **Download chord reference (PDF)** below the keyboard on desktop,
+or inside **⋯ (More actions)** on a phone.
 
 The download contains **12 A4 landscape pages**, one per chromatic root, with
 **four complete keyboards per page**: major, minor, dominant 7th and minor 7th.

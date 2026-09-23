@@ -10,4 +10,5 @@ High-level index of documentation files for the Accordion Keyboard Visualizer.
 
 - [Architecture](dev/architecture.md)
 - [Data Model](dev/data-model.md)
+- [Song Exchange Format](dev/song-files.md)
 - [Contributing Guidelines](dev/contributing.md)

@@ -1,16 +1,23 @@
 import { jsPDF } from "jspdf";
 import { svg2pdf } from "svg2pdf.js";
 
-export interface SongPdfOptions {
-  title: string;
-  keyboardName: string;
-  cards: Array<{ label: string; svg: SVGSVGElement }>;
-  language: "en" | "fr";
+export interface PdfCard {
+  label: string;
+  svg: SVGSVGElement;
 }
 
-const MARGIN = 14;
-const CARD_GAP = 10;
-const CARDS_PER_PAGE = 2;
+export type SongPdfOptions = {
+  title: string;
+  keyboardName: string;
+  language: "en" | "fr";
+} & (
+  | { cards: PdfCard[]; pages?: never }
+  | { pages: Array<{ title: string; cards: PdfCard[] }>; cards?: never }
+);
+
+const MARGIN = 12;
+const CARD_GAP = 8;
+const MAX_CARDS_PER_PAGE = 4;
 
 /** Keep French accents while staying within the built-in PDF font's WinAnsi set. */
 function pdfText(value: string): string {
@@ -75,40 +82,77 @@ function prepareSvg(source: SVGSVGElement) {
 }
 
 /**
- * Download a vector A4 chord sheet. Import this module on demand so the PDF
+ * Download a vector A4 landscape sheet with aspect-ratio-based pagination. Import this module on demand so the PDF
  * dependencies are separate from the application's initial JavaScript bundle.
  */
-export async function exportSongPdf({ title, keyboardName, cards, language }: SongPdfOptions): Promise<void> {
-  if (cards.length === 0) {
+export async function exportSongPdf({ title, keyboardName, cards, pages, language }: SongPdfOptions): Promise<void> {
+  if (pages && (pages.length === 0 || pages.some(page => page.cards.length === 0 || page.cards.length > MAX_CARDS_PER_PAGE))) {
+    throw new Error("Explicit PDF pages must contain between one and four keyboards.");
+  }
+  const allCards = pages ? pages.flatMap(page => page.cards) : cards!;
+  if (allCards.length === 0) {
     throw new Error("Add at least one chord before exporting a song.");
   }
 
-  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+  const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4", compress: true });
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   const contentWidth = pageWidth - MARGIN * 2;
-  const cardWidth = (contentWidth - CARD_GAP) / CARDS_PER_PAGE;
-  const pageCount = Math.ceil(cards.length / CARDS_PER_PAGE);
   const songTitle = title.trim() || (language === "fr" ? "Morceau sans titre" : "Untitled song");
   const pushLabel = language === "fr" ? "Poussé (gauche)" : "Push (left)";
   const pullLabel = language === "fr" ? "Tiré (droite)" : "Pull (right)";
 
   pdf.setProperties({ title: songTitle, subject: keyboardName, creator: "Accordion Keyboard Map" });
 
+  // Measure the shared header once so long titles also affect available space.
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(15);
+  const pageTitleLines = pages?.map(page => limitedLines(pdf, page.title, contentWidth, 2));
+  const titleLines = limitedLines(pdf, songTitle, contentWidth, 2);
+  const maxTitleLines = pageTitleLines ? Math.max(...pageTitleLines.map(lines => lines.length)) : titleLines.length;
+  const titleY = 14;
+  const keyboardY = titleY + (maxTitleLines - 1) * 6 + 5;
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(9);
+  const keyboardLines = limitedLines(pdf, keyboardName, contentWidth, 2);
+  const legendY = keyboardY + (keyboardLines.length - 1) * 4 + 6;
+  const labelY = legendY + 8;
+  const svgY = labelY + 10; // Room for two lines of chord name.
+  const maxSvgHeight = pageHeight - MARGIN - 5 - svgY;
+
+  const preparedCards = allCards.map(card => ({ label: card.label, ...prepareSvg(card.svg) }));
+  // Fit to the usable height first. Never shrink keyboards further merely to
+  // squeeze in another column; use the widest aspect ratio for a stable layout.
+  const widestAtFullHeight = Math.max(...preparedCards.map(card => maxSvgHeight * card.width / card.height));
+  // Explicit pages keep chord families together, scaling down if necessary.
+  const cardsPerPage = pages ? Math.max(...pages.map(page => page.cards.length)) : Math.max(1, Math.min(
+    MAX_CARDS_PER_PAGE,
+    allCards.length,
+    Math.floor((contentWidth + CARD_GAP) / (widestAtFullHeight + CARD_GAP))
+  ));
+  const cardWidth = (contentWidth - CARD_GAP * (cardsPerPage - 1)) / cardsPerPage;
+  let offset = 0;
+  const preparedPages = pages
+    ? pages.map(page => {
+      const group = preparedCards.slice(offset, offset + page.cards.length);
+      offset += page.cards.length;
+      return group;
+    })
+    : Array.from({ length: Math.ceil(allCards.length / cardsPerPage) }, (_, index) =>
+      preparedCards.slice(index * cardsPerPage, (index + 1) * cardsPerPage));
+  const pageCount = preparedPages.length;
+
   for (let page = 0; page < pageCount; page++) {
     if (page > 0) pdf.addPage();
     pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(17);
+    pdf.setFontSize(15);
     pdf.setTextColor(25, 35, 45);
-    const titleLines = limitedLines(pdf, songTitle, contentWidth, 2);
-    titleLines.forEach((line, index) => pdf.text(line, pageWidth / 2, 19 + index * 7, { align: "center" }));
-    let y = 19 + (titleLines.length - 1) * 7 + 7;
+    (pageTitleLines?.[page] ?? titleLines).forEach((line, index) => pdf.text(line, pageWidth / 2, titleY + index * 6, { align: "center" }));
 
     pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(10);
-    const keyboardLines = limitedLines(pdf, keyboardName, contentWidth, 2);
-    keyboardLines.forEach((line, index) => pdf.text(line, pageWidth / 2, y + index * 4.5, { align: "center" }));
-    y += (keyboardLines.length - 1) * 4.5 + 7;
+    pdf.setFontSize(9);
+    keyboardLines.forEach((line, index) => pdf.text(line, pageWidth / 2, keyboardY + index * 4, { align: "center" }));
+    const y = legendY;
 
     pdf.setFontSize(9);
     const pushWidth = pdf.getTextWidth(pushLabel);
@@ -121,24 +165,21 @@ export async function exportSongPdf({ title, keyboardName, cards, language }: So
     pdf.rect(legendX + 5 + pushWidth + 9, y - 2.5, 3, 3, "F");
     pdf.text(pullLabel, legendX + 5 + pushWidth + 9 + 5, y);
 
-    const labelY = y + 11;
-    const svgY = labelY + 12;
-    const maxSvgHeight = pageHeight - MARGIN - 8 - svgY;
-    const pageCards = cards.slice(page * CARDS_PER_PAGE, (page + 1) * CARDS_PER_PAGE);
+    const pageCards = preparedPages[page];
+    // Keep the same scale on the last page and center any partial group.
+    const groupWidth = pageCards.length * cardWidth + (pageCards.length - 1) * CARD_GAP;
+    const groupX = (pageWidth - groupWidth) / 2;
 
     for (let column = 0; column < pageCards.length; column++) {
       const card = pageCards[column];
-      // Center a final lone chord instead of leaving an empty second column.
-      const cardX = pageCards.length === 1
-        ? (pageWidth - cardWidth) / 2
-        : MARGIN + column * (cardWidth + CARD_GAP);
+      const cardX = groupX + column * (cardWidth + CARD_GAP);
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(13);
       pdf.setTextColor(25, 35, 45);
       const labelLines = limitedLines(pdf, card.label, cardWidth, 2);
       labelLines.forEach((line, index) => pdf.text(line, cardX + cardWidth / 2, labelY + index * 5, { align: "center" }));
 
-      const { svg, width, height } = prepareSvg(card.svg);
+      const { svg, width, height } = card;
       const ratio = Math.min(cardWidth / width, maxSvgHeight / height);
       const exportWidth = width * ratio;
       const exportHeight = height * ratio;

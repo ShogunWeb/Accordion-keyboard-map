@@ -2,15 +2,17 @@
 
 This file summarizes the project to give an LLM quick context before it
 starts working on this application. Reviewed against source code on
-2026-09-21. Treat the code and configuration as the source of truth;
+2026-09-22. Treat the code and configuration as the source of truth;
 re-validate this summary when they change.
 
 ## 1. Overview
 
 PWA (React + TypeScript + Vite) that displays the right-hand keyboard of a
 diatonic/unisonoric accordion as SVG, and highlights the notes of a selected
-chord or scale (computed via Tonal.js). Personal project, deployed on GitHub
-Pages, licensed under AGPLv3+.
+chord or scale (computed via Tonal.js). Also manages named songs containing
+unique chords, each shown on a complete keyboard, with browser-local storage
+and direct PDF download. Personal project, configured for GitHub Pages and
+licensed under AGPLv3+. Local features may not yet be deployed.
 
 - GitHub repo: https://github.com/ShogunWeb/Accordion-keyboard-map
 - Live app: https://shogunweb.github.io/Accordion-keyboard-map/
@@ -24,11 +26,13 @@ Pages, licensed under AGPLv3+.
 ## 2. Tech stack
 
 - React 19 + TypeScript, build/dev via Vite 7
-- Styling currently uses plain CSS in `src/styles.css` and `src/App.css`.
+- Styling uses plain CSS in `src/styles.css`, `src/App.css`, and
+  `src/components/Songbook.css`.
   Tailwind CSS 4 is installed and configured via `@tailwindcss/postcss`, but
   the CSS entry point does not import Tailwind or include its directives.
 - Tonal.js (`tonal`) for music theory (chords/scales/pitch class)
 - Keyboard rendered in pure SVG (no canvas, no graphics library)
+- Direct vector PDF export: jsPDF 4 + svg2pdf.js 2, loaded on demand; no backend
 - Tests: Vitest + @testing-library/react + jsdom
 - Lint: ESLint 9 (flat config) + typescript-eslint
 - API docs: Typedoc (`npm run docs`)
@@ -40,7 +44,7 @@ Pages, licensed under AGPLv3+.
   http://localhost:5173/Accordion-keyboard-map/; use the URL Vite prints)
 - `npm run build` — custom build via `scripts/build.mjs`: `tsc -b` → `vite build`
   → writes `dist/version.json` → stamps `dist/sw.js` with the build version
-  (see §8 versioning/PWA)
+  (see §10 versioning/PWA)
 - `npm run preview` — preview the production build
 - `npm run lint` — ESLint
 - `npm test` — Vitest (normally watch mode locally); use `npm test -- --run`
@@ -57,7 +61,7 @@ from the committed `package-lock.json`.
 ```
 src/
   main.tsx                     # React entry point
-  App.tsx                      # root component: UI state, i18n, tonal.js logic
+  App.tsx                      # keyboard/song views, UI preferences, songbook hook, i18n
   App.css                      # application styles, imported by App.tsx
   styles.css                   # global styles, imported by main.tsx
   index.css                    # unused starter stylesheet (not imported)
@@ -66,16 +70,33 @@ src/
   components/
     AccordionKeyboard.tsx      # SVG layout, pitch-class matching and note labels
     AccordionKeyboard.test.tsx
+    ChordReferenceButton.tsx   # 12-page chord reference action and transient SVG snapshots
+    ChordReferenceButton.css
+    ChordReferenceButton.test.tsx
+    Songbook.tsx               # library, chord editor/cards, local translations, PDF action
+    Songbook.css
+    Songbook.test.tsx           # import preview, confirmation/remapping and export scopes
+  hooks/
+    useSongbook.ts              # library state and persistence, CRUD, duplicate prevention
+    useSongbook.test.ts
   data/
     types.ts                   # shared types: ButtonLayout, KeyboardRow, KeyboardDefinition
     index.ts                   # loads all *.keyboard.ts files via import.meta.glob, sorts by name
+    songs.ts                   # song/chord types, versioned storage schema and validation
     keyboards/
       dg.keyboard.ts           # id "DG" — D/G keyboard
       gc.keyboard.ts           # id "GC" — G/C keyboard
       gcf.keyboard.ts          # id "GCF" — G/C/F keyboard
       image-3rangs.keyboard.ts # id "image-3rangs" — Serafini 3-row, Darwin bass system (app's default keyboard)
   utils/
-    noteUtils.ts                # toPitchClass() (via Tonal.Note), formatNoteLabel() (anglo/fr)
+    noteUtils.ts               # toPitchClass(), formatNoteLabel() (anglo/fr)
+    chordReference.ts          # 12 chromatic roots × maj/min/7/m7, localized headings
+    musicUtils.ts              # shared selectors, getSelectionHighlights(), formatChordName()
+    musicUtils.test.ts
+    songTransfer.ts            # versioned JSON song exchange, validation and download
+    songTransfer.test.ts
+    exportSongPdf.ts           # on-demand SVG-to-PDF export, A4 pagination
+    exportSongPdf.test.ts
 public/
   manifest.webmanifest, sw.js, favicon.svg, icons/
 scripts/
@@ -84,8 +105,9 @@ scripts/
   build-version.test.ts # checks source placeholder and generated version consistency
 docs/
   index.md, SUMMARY.md
-  user/getting-started.md      # user docs (how to use the app)
-  dev/architecture.md          # architecture overview; partly outdated (see §11)
+  user/getting-started.md      # user docs, including song backup/restore
+  dev/song-files.md           # portable JSON schema and import rules
+  dev/architecture.md          # architecture overview; partly outdated (see §13)
   dev/data-model.md            # data model; normalization guidance is partly aspirational
   dev/contributing.md          # note: still references an older monolithic
                                   `data/keyboards.ts` file — outdated, the real
@@ -123,24 +145,36 @@ No need to touch a central file.
 - Main state: selected keyboard, mode (`chord`/`scale`), root note,
   chord/scale type, language (`en`/`fr`), notation (`anglo`/`fr` = Do Re Mi),
   zoom level, legend visibility, side drawer open state (view "selection" or
-  "settings").
-- `applySelection()`: calls Tonal.js's `Chord.get()` or `Scale.get()`,
-  normalizes the notes to pitch classes (0–11) via `toPitchClass`, builds a
-  pitch-class → label map to respect the chosen accidental (# vs b), and
-  passes `highlightNotes`/`highlightLabels` to `AccordionKeyboard`.
+  "settings"). Additional session state: view (`keyboard`/`songs`), active
+  song ID, and draft chord passed from the keyboard to the song editor.
+- `getSelectionHighlights(mode, root, type)` in `src/utils/musicUtils.ts`
+  calls Tonal.js's `Chord.get()` or `Scale.get()`, normalizes notes to chroma
+  (0–11), and builds preferred labels that preserve musical spelling. App
+  memoizes its result; Songbook uses the same helper for every chord card.
+  The former `applySelection()` callback and highlighting effects were removed.
+- `chordTypes` and `rootNotes` also live in `musicUtils.ts`; scale types and
+  French scale names remain in App. `formatChordName()` produces compact song
+  labels (`Am`, `E7`, `C` for major), using the selected note notation.
 - Selection is applied automatically when root, type or mode changes;
-  there is no Apply button. Switching modes resets the type to `maj` for
-  chords or `major` for scales.
-- i18n: `en`/`fr` translation dictionary hardcoded in `App.tsx` (no i18n
-  library). Language auto-detected from `navigator.language` if nothing is
-  saved yet.
+  there is no Apply button. `changeMode()` resets the type to `maj`/`major`
+  only when the user switches modes; loading saved preferences no longer
+  triggers a mode-reset effect that would overwrite the saved type.
+- i18n: separate `en`/`fr` dictionaries in `App.tsx` and `Songbook.tsx`
+  (no i18n library). PDF headings/legend also have English/French text.
+  Language is inferred from the browser when no preferences are saved.
+  UI language and note notation remain independent global preferences.
 - Persistence: `localStorage` under the `akm-settings` key, with fields
   `keyboardId`, `language`, `notation`, `fundamental`, `type`, `selectionMode`,
   `zoomIndex`, `showLegend`. Check restoration after reload when changing
-  initialization or mode effects; persistence is not covered by tests.
+  initialization or mode handling; App preference restoration is not covered
+  by committed integration tests. Songbook persistence is separate (see §8).
 - User feedback: text form that opens a `mailto:` link to
   accordion@shogunweb.be.
 - "Source code" link to the GitHub repo in the Settings panel.
+- Navigation switches between Keyboard and My songs without a router. Settings
+  are available in both views; the closed drawer is inert and aria-hidden.
+- In chord mode, "Add to a song" opens My songs with the current chord
+  preselected. The user still chooses/creates the target song and clicks Add.
 
 ## 7. SVG rendering (AccordionKeyboard.tsx)
 
@@ -158,12 +192,130 @@ No need to touch a central file.
 - `scale` (prop) drives a responsive button size (zoomLevels in App.tsx:
   `[0.7, 0.8, 0.9, 1, 1.2]`).
 
-## 8. PWA / Service Worker / versioning
+## 8. Saved songs (Songbook / useSongbook)
+
+Product scope: a sheet of distinct chords used in a song, not a timeline with
+repeated chords. Each card shows the entire selected right-hand keyboard,
+with all matching push/pull notes highlighted. There is no automatic fingering
+selection or reduction to three/four buttons.
+
+```ts
+type ChordSpec = { root: string; type: string };
+type SongChord = ChordSpec & { id: string };
+type Song = {
+  id: string;
+  title: string;
+  keyboardId: string;
+  chords: SongChord[];
+};
+// localStorage["akm-songbook"] = JSON.stringify({ version: 1, songs: Song[] })
+```
+
+- `useSongbook()` is mounted in App, so in-memory changes survive navigation
+  between views. It exposes songs, storageError, createSong, renameSong,
+  setSongKeyboard, addChord, updateChord, removeChord, moveChord, deleteSong,
+  importSongs (atomic additive import with fresh local IDs).
+- A song remembers its own keyboard ID. Changing the global keyboard does
+  not change existing songs; changing a song's keyboard recalculates its cards.
+- Chords are stored as root/type plus a stable ID, not SVGs or computed notes.
+  Display order is the array order; move actions exchange adjacent entries.
+- Duplicate detection compares exact `root` + `type`, on both add and edit.
+  Repeated Am is rejected, while A# and Bb spellings remain distinct. Supported
+  roots/types come from the shared selectors; new chord types require updating
+  those selectors as well as the Songbook quality labels.
+- Songbook supports create/select/rename/delete, chord add/edit/remove/reorder,
+  and PDF download. Song title edits save on blur (Enter blurs), with a
+  100-character UI limit. Song deletion requires an in-app confirmation.
+- The hook reads and validates storage synchronously on initialization. Mounting
+  alone never writes; mutations save immediately in their action handlers.
+- Validation rejects malformed JSON/schema, unsupported versions, invalid or
+  duplicate IDs/chords, and currently unknown keyboard IDs. Invalid saved data
+  is preserved, loading returns an empty library with an error, and writes are
+  disabled for that session. Do not silently discard or overwrite such data.
+- `storageError`: `unavailable`, `quota`, `invalid`, or null. Write failures keep
+  edits in memory and surface a message; a later mutation retries if initial
+  loading allowed writes. An initial read failure disables writes for the session.
+- Storage is local to this browser/origin. No account, automatic cross-device
+  sync or cross-tab synchronization. Clearing site data removes saved songs.
+  JSON exports provide editable backups/transfers; PDF is printable output.
+
+### Song import/export
+
+- `src/utils/songTransfer.ts` provides parseSongFile, serializeSongFile and
+  downloadSongFile, without new dependencies. See `docs/dev/song-files.md`.
+- Exchange format: `{ format: "accordion-keyboard-map/songs", version: 1,
+  songs: [{ title, keyboardId, chords: [{ root, type }] }] }` in UTF-8 JSON.
+  Local IDs, UI preferences, computed SVGs and keyboard definitions are omitted.
+  Chord spelling/order are preserved. Local storage uses a different envelope;
+  raw localStorage dumps are not accepted as exchange files.
+- Export this song downloads one song; Export all songs downloads the library.
+  Files use `.akm.json`. Import validates the whole file, then shows a preview.
+  Unsupported versions, malformed data or duplicate chords are rejected; empty
+  chord sheets are allowed. Both serialization/import enforce a 2 MiB limit.
+- Unknown keyboard IDs in exchange files are allowed through syntax validation
+  but require explicit UI remapping before import. This differs from the local
+  storage parser, which still rejects unknown keyboard IDs.
+- Confirmed imports add copies in a single update, with fresh song/chord IDs.
+  Existing songs remain intact; colliding titles receive `(2)`, `(3)`, etc.
+  `importSongs()` revalidates resolved records before changing state/storage.
+  Repeated imports add copies rather than merging; cancelling changes nothing.
+- Storage failures keep imported data in memory and display the existing error
+  message. Song export is also available while working with unsaved memory data.
+
+## 9. Direct PDF export
+
+- `Songbook.tsx` clones all displayed card SVGs and captures their labels before
+  dynamically importing `src/utils/exportSongPdf.ts`. Keep this import dynamic
+  so jsPDF/svg2pdf do not enter the initial application bundle.
+- API: `exportSongPdf({ title, keyboardName, cards: [{ label, svg }], language })`.
+  The exporter creates the document entirely in the browser and downloads a
+  sanitized filename derived from the song title; nothing is sent to a backend.
+- The same API alternatively accepts `pages: [{ title, cards: [{ label, svg }] }]`
+  instead of `cards`. Explicit groups must contain 1–4 keyboards and each occupies
+  one page, with its own heading; the maximum group size fixes the column width.
+  These pages scale keyboards as necessary to preserve grouping.
+- `ChordReferenceButton.tsx`, below the explorer keyboard in both chord/scale
+  modes, downloads a complete reference: 12 landscape pages, four full keyboards
+  per root (major, minor, dominant 7th, minor 7th). `chordReference.ts` chooses
+  C, Db, D, Eb, E, F, F#, G, Ab, A, Bb, B without enharmonic duplicates.
+  It uses the selected keyboard, language and notation, shared music helpers
+  and `AccordionKeyboard`. On click, a transient hidden React render is flushed
+  synchronously, its 48 SVGs cloned, then removed; only then is the exporter
+  dynamically loaded. Settings are captured before awaiting, the button is
+  disabled while busy, and errors allow retry. No library/settings writes.
+- Song PDFs use vector A4 landscape with an automatic single-row layout, up to four full
+  keyboards per page. Header height is measured first (including wrapped titles).
+  The widest SVG aspect ratio, fitted to the remaining height, determines how
+  many columns fit the available width and gaps. Wider keyboards get three,
+  two, or one column rather than being shrunk to force four. All current layouts
+  fit four per page; SVG viewBox proportions, not screen zoom, drive this choice.
+- Layout constants in exportSongPdf.ts: 12 mm margins, 8 mm gaps, maximum four
+  columns. Incomplete final rows are centered with the same keyboard scale as
+  previous pages; keyboards are never split. Every page includes song title (or explicit group heading),
+  keyboard name, push/pull legend, chord labels, and page number.
+- SVG clones use explicit Helvetica and fixed dimensions derived from viewBox;
+  responsive screen styles are removed. The screen SVGs are not modified.
+- Titles/labels wrap up to two lines and are truncated if needed. Built-in PDF
+  fonts cover French accents; unsupported characters in headings become `?`.
+- The download button is disabled for an empty song, missing keyboard, or export
+  in progress. Failures produce an error message and allow another attempt.
+- Reference production build: initial JS ~78 KB gzip, exporter ~153 KB gzip
+  (sizes vary with changes). Optional jsPDF chunks may appear in dist without
+  being needed by the SVG export path; inspect actual network requests before
+  claiming their download cost.
+- The PDF module is fetched on first use, then can be cached by the service
+  worker. A first export while offline is not guaranteed; verify caching and
+  offline export against a production preview, including after an app update.
+
+## 10. PWA / Service Worker / versioning
 
 - `public/sw.js` contains an `__AKM_BUILD_VERSION__` placeholder replaced at
   build time by `scripts/stamp-sw.mjs`. Caching strategy: cache-first for
   assets, cached `index.html` served for any navigation (offline SPA),
   `version.json` always fetched from the network (`cache: "no-store"`).
+  Successful fetched assets are cached with `event.waitUntil` so the worker
+  stays alive during cache writes. Lazy PDF resources are not in the static
+  precache list; they must have been fetched before offline use.
 - `src/serviceWorker.ts`: registers the SW (skipped in dev via
   `import.meta.env.DEV`), checks `version.json` at registration, after a short
   delay, and on focus/online/pageshow/visibility events (no periodic interval).
@@ -185,7 +337,7 @@ No need to touch a central file.
 - Validate offline/update behavior with `npm run build` and `npm run preview`
   at the configured subpath; development mode does not register a SW.
 
-## 9. CI/CD
+## 11. CI/CD
 
 `.github/workflows/deploy.yml` (single "CI and Deploy" workflow):
 - On push/PR/workflow_dispatch: checkout, Node 20, `npm ci`, `npm run build`,
@@ -194,22 +346,50 @@ No need to touch a central file.
   `deploy` job publishes to GitHub Pages via `actions/deploy-pages`.
 - Lint is not currently part of this workflow; run it locally.
 
-## 10. Existing tests
+## 12. Existing tests and validation status
 
 - `src/components/AccordionKeyboard.test.tsx` — 3 tests: button/label rendering,
   push/pull highlight colors, and scaled button radius.
+- `src/utils/musicUtils.test.ts` — 8 tests: chord/scale highlights, musical
+  spelling, invalid selection, compact chord names and French notation.
+- `src/hooks/useSongbook.test.ts` — 20 tests: initial load without writes,
+  creation/restoration, deduplication, editing/order/removal, validation, storage
+  failures, atomic additive imports, title collisions and fresh IDs.
+- `src/utils/songTransfer.test.ts` — 14 tests: JSON round trips, spelling/order,
+  multiple/empty songs, unknown keyboard references, invalid files and size limits.
+- `src/components/Songbook.test.tsx` — 3 UI integration tests: import preview and
+  confirmation, unknown keyboard mapping, cancellation/invalid files, export
+  scopes. JSON file download is mocked in these tests.
+- `src/utils/exportSongPdf.test.ts` — 14 tests: explicit 12-page groups (including wide SVGs), invalid groups, landscape page dimensions,
+  adaptive columns for narrow/wide/mixed SVGs, proportions and page bounds,
+  no overlaps/blank pages, centering of partial rows without scale changes,
+  independence from screen zoom, long titles, source SVG preservation, filenames.
+  svg2pdf conversion and saving are mocked; real rendering needs a browser check.
 - `scripts/build-version.test.ts` — 2 tests: source placeholder presence and
   version consistency across generated files. The latter returns without
   checking artifacts if `dist/version.json` is absent: build before testing.
-  It expects `YYYYMMDD-HHMM-NNNN`, including when `AKM_BUILD_VERSION` is set.
-- Vitest setup: `src/setupTests.ts`, `jsdom` environment.
-- No automated coverage of App interactions, preference restoration, PWA
-  lifecycle/offline behavior, or full browser/mobile rendering.
-- Baseline on 2026-09-21, Node 24.14.1: lint and build succeeded; all 5 tests
-  passed after building. Build reported outdated Browserslist data (nonfatal).
-  No browser-based visual or PWA validation was performed in this review.
+  It finds the app's entry script via dist/index.html, rather than selecting an
+  arbitrary JS bundle now that lazy chunks exist. Expected version format is
+  `YYYYMMDD-HHMM-NNNN`, including when `AKM_BUILD_VERSION` is set.
+- Vitest setup: `src/setupTests.ts`, jsdom, matchMedia stub, jest-dom matchers.
+- `src/components/ChordReferenceButton.test.tsx` — 2 integration tests: full
+  48-keyboard output, note highlighting across all roots/qualities, localized
+  headings, settings snapshot, busy state and error recovery.
+- Baseline reviewed on 2026-09-22: 66 tests pass in 8 files. Lint and production
+  build pass; build reports outdated Browserslist data (nonfatal).
+- Browser check on 2026-09-22: downloaded a PDF through Songbook in Chromium
+  from the dev server with seven chords on the Serafini keyboard, French note
+  notation, and an accented title. Read and visually inspected both PDF pages:
+  four complete keyboards followed by three centered keyboards, A4 landscape.
+- Browser JSON check on 2026-09-22, Chromium against production preview:
+  downloaded one/all songs, round-tripped into a fresh browser, imported without
+  replacing existing songs, checked reload, invalid file rejection and unknown
+  keyboard mapping. Import UI visually checked at 390 px with no overflow.
+- No committed browser end-to-end suite. Broader App interaction coverage and
+  production/offline PDF behavior remain unverified; successful JSON transfer
+  checks do not establish those.
 
-## 11. Known gaps / tech debt
+## 13. Known gaps / tech debt
 
 - `docs/dev/contributing.md` still references the older
   `src/data/keyboards.ts` (single-file) structure — **outdated**, the actual
@@ -223,11 +403,16 @@ No need to touch a central file.
 - No handling of the left-hand (bass) keyboard — noted as a future extension
   in `docs/dev/architecture.md`.
 - No routing, single-page app.
-- i18n limited to en/fr, hardcoded (no separate translation files).
+- i18n limited to en/fr, hardcoded in the UI components and PDF exporter.
+- Removing/renaming a keyboard ID currently makes a saved songbook referring
+  to it fail validation. Songbook has a missing-keyboard UI fallback, but the
+  parser rejects that state during reload; consider a migration/recovery path
+  before changing keyboard IDs.
+- Full App interaction/offline validation is still needed (see §12).
 - README lists "Import/export of keyboard JSON layouts" as a future
   improvement, not yet implemented.
 
-## 12. Quick start
+## 14. Quick start
 
 From the repository root, install dependencies and start development:
 
@@ -251,15 +436,39 @@ a browser:
 - Try chord and scale modes, including sharps/flats and enharmonic notes.
 - Change language and note notation independently; check zoom and mobile layout.
 - Reload after changing preferences, including a non-default chord/scale type.
+- Create a song with Am, Dm, E7; attempt a duplicate add/edit, reorder/remove,
+  rename it, change its keyboard, navigate between views, and reload.
+- Download landscape PDFs with 1, 2, 3, 4, 5, and 7 chords on different keyboard
+  layouts. Check automatic column counts, centered partial final rows, every
+  button/note, French accents, long titles, sharp/flat spellings, page breaks,
+  and readable print size.
+- Download the full chord reference for different layouts and notations:
+  12 landscape pages, correct root headings, exactly four complete keyboards
+  (maj/min/7/m7) each, unchanged explorer settings and song library.
+- Check that the PDF module is not fetched on initial load; export once online,
+  reload offline, and retry. Also test a first offline export without a cached
+  exporter and confirm a useful error rather than a stuck download button.
+- Export one/all songs and import into an empty and an existing library; check
+  order, keyboard, names, fresh IDs, cancellation and invalid files. Resolve an
+  unknown keyboard explicitly and reload to confirm the mapped song persists.
 - For PWA changes, use preview to check offline loading after assets are cached,
   then a second build with a new version to check the update prompt and reload.
 
-## 13. Working-session guidance
+## 15. Working-session guidance
 
 - Read the relevant source before editing; this file is a starting map.
 - Preserve the data conventions in §5, chroma-based matching, and the separate
   language/notation settings when changing musical or display behavior.
-- Keep both translation dictionaries in sync when adding translatable UI text.
+- Keep English/French entries in sync in both App and Songbook, and update PDF
+  text when relevant. Language and note notation are independent.
+- Use the shared music helpers and existing SVG renderer for new chord views.
+  Preserve per-song keyboard IDs, stable chord IDs, and duplicate rules.
+- Treat stored song data as user content: version schema changes and preserve
+  unreadable data. Exchange files are a separate versioned schema; preserve
+  additive import semantics and explicit mapping of unknown keyboards.
+  Keep PDF dependencies behind the dynamic import.
+- Write commit messages in English (also configured for VS Code Copilot in
+  `.vscode/settings.json`).
 - Treat `dist/` as generated output; change sources and rebuild.
 - Report the checks actually run and any remaining validation limits.
 - Update this context when architecture, commands, data conventions or PWA

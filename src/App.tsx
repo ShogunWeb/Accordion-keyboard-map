@@ -6,6 +6,7 @@ import type { KeyboardDefinition } from "./data";
 import favicon from "/favicon.svg";
 import { formatNoteLabel } from "./utils/noteUtils";
 import { chordTypes, getSelectionHighlights, rootNotes } from "./utils/musicUtils";
+import { ChordReferenceButton } from "./components/ChordReferenceButton";
 import { Songbook } from "./components/Songbook";
 import { useSongbook } from "./hooks/useSongbook";
 import type { ChordSpec } from "./data/songs";
@@ -343,6 +344,7 @@ export const App: React.FC = () => {
             closeDrawer();
           }}>+ {t.addToSong}</button>
         </div>}
+        <ChordReferenceButton keyboard={selectedKeyboard} language={language} notation={notation} />
       </section>}
 
       {drawerOpen && <div className="drawer-backdrop" onClick={closeDrawer} aria-hidden="true" />}

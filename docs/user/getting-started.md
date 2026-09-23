@@ -82,6 +82,48 @@ To change or reset highlights:
 - Reload the page to clear all selections.
 
 
+## Downloading a complete chord reference
+
+In the **Keyboard** view, select your keyboard and note notation in **Settings**,
+then use **Download chord reference (PDF)** below the keyboard.
+
+The download contains **12 A4 landscape pages**, one per chromatic root, with
+**four complete keyboards per page**: major, minor, dominant 7th and minor 7th.
+Each keyboard highlights all matching push/pull notes, just like the explorer.
+The reference includes C, Db, D, Eb, E, F, F#, G, Ab, A, Bb and B (or their French
+names); equivalent sharp/flat roots are not repeated. Highlighted notes show
+available positions, not a prescribed fingering or a guarantee that the whole
+chord is playable in one bellows direction.
+
+The PDF uses the selected keyboard model, interface language and note notation.
+This action does not create songs or change your library. Wide layouts are
+scaled to keep the four variants together. The PDF exporter loads on first use;
+if a download fails, reconnect and try again.
+
+## Backing up and sharing songs
+
+In **My songs**, use **Export this song** to download the selected song, or
+**Export all songs** to back up your library. The `.akm.json` file contains the
+song titles, ordered unique chords and associated keyboard models. It can be
+opened again for editing; **Download PDF** produces the separate printable sheet.
+
+To restore or transfer songs:
+
+1. Choose **Import songs** and select an exported `.akm.json` file.
+2. Review the songs in the preview. If a keyboard is unavailable, choose its
+   replacement; the app will recalculate the chord positions on that keyboard.
+3. Choose **Add these songs**. Existing songs are kept. Matching titles receive
+   a numbered suffix, so importing a file again creates additional copies.
+
+Songs stay in the browser's local storage. Keep the exported file to move them
+to another device or restore them after clearing site data. There is no automatic
+synchronization, and the file does not include custom keyboard definitions or
+chosen fingerings. Importing does not change your display preferences.
+
+Files are limited to 2 MB. Invalid or unsupported files are rejected before any
+songs are added. If the browser cannot save imported changes, a warning appears;
+export those songs before closing the page.
+
 ## Tips for Practice
 
 - Use scale mode to explore where the notes of a key live on your keyboard  

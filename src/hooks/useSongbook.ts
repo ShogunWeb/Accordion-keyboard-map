@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import { keyboards } from "../data";
 import { isChordSpec, parseSongbook, sameChord, SONGBOOK_STORAGE_KEY, SONGBOOK_VERSION } from "../data/songs";
 import type { ChordSpec, Song, SongbookStorageError } from "../data/songs";
+import type { PortableSong } from "../utils/songTransfer";
 
 interface SongbookState {
   songs: Song[];
@@ -127,9 +128,29 @@ export function useSongbook() {
     changeSongs(songs => songs.some(song => song.id === id) ? songs.filter(song => song.id !== id) : songs);
   }, [changeSongs]);
 
+  /** Add an entire validated import atomically with fresh IDs, never replace songs. */
+  const importSongs = useCallback((incoming: readonly PortableSong[]): Song[] => {
+    const titles = new Set(stateRef.current.songs.map(song => song.title));
+    const imported = incoming.map(item => {
+      const baseTitle = item.title.trim();
+      let title = baseTitle;
+      let copy = 2;
+      while (titles.has(title)) title = `${baseTitle} (${copy++})`;
+      titles.add(title);
+      return {
+        id: createId(), title, keyboardId: item.keyboardId,
+        chords: item.chords.map(chord => ({ id: createId(), root: chord.root, type: chord.type })),
+      };
+    });
+    // Revalidate at the mutation boundary (including resolved keyboard IDs).
+    parseSongbook(JSON.stringify({ version: SONGBOOK_VERSION, songs: imported }));
+    if (imported.length) changeSongs(songs => [...songs, ...imported]);
+    return imported;
+  }, [changeSongs]);
+
   return {
     songs: state.songs,
     storageError: state.storageError,
-    createSong, renameSong, setSongKeyboard, addChord, updateChord, removeChord, moveChord, deleteSong,
+    createSong, renameSong, setSongKeyboard, addChord, updateChord, removeChord, moveChord, deleteSong, importSongs,
   };
 }

@@ -158,6 +158,14 @@ npm run preview
 
 ---
 
+## Custom keyboards in the app
+
+Open **My keyboards** to create a 2 or 3 row layout (5–14 buttons per row),
+copy an existing model, edit push/pull notes and row offsets, and preview it.
+Saved custom keyboards work in the explorer, songs and PDFs. JSON import/export
+backs up or shares your layouts; see the [user guide](docs/user/getting-started.md)
+and [file format](docs/dev/keyboard-files.md).
+
 ## ➕ Adding a New Keyboard Layout
 
 Keyboard layouts live in **separate files** under `src/data/keyboards/` and are auto-loaded by `src/data/index.ts` using `import.meta.glob`. To add one:
@@ -194,7 +202,6 @@ Keyboard layouts live in **separate files** under `src/data/keyboards/` and are 
 
 ## 📌 Future Improvements
 
-- Import/export of keyboard JSON layouts
 
 ---
 

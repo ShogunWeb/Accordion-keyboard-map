@@ -1,0 +1,36 @@
+.keyboard-editor, .editor-library, .editor-form { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.keyboard-editor h2, .keyboard-editor h3 { margin: 0; }
+.keyboard-editor h2 { font-size: 1.5rem; }
+.keyboard-editor input { width: 100%; min-width: 0; border: 1px solid #cbd5e1; border-radius: 8px; padding: 9px 7px; font: inherit; color: #0f172a; background: white; }
+.keyboard-editor input:focus-visible { outline: 2px solid #0284c7; outline-offset: 2px; }
+.keyboard-editor input[aria-invalid="true"] { border: 2px solid #b91c1c; background: #fff1f2; }
+.editor-start { display: flex; align-items: end; gap: 10px; flex-wrap: wrap; }
+.editor-start .field { flex: 1; min-width: 180px; }
+.editor-metadata { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 12px; }
+.editor-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 14px; align-items: start; }
+.editor-rows { display: flex; gap: 10px; min-width: 0; align-items: start; }
+.editor-row { flex: 1 1 0; min-width: 0; padding: 10px 6px; margin: 0; box-shadow: none; }
+.editor-row legend { font-weight: 700; font-size: .85rem; padding: 0 4px; }
+.editor-row .field { margin-bottom: 8px; padding: 6px; }
+.editor-row .field span { font-size: .75rem; }
+.editor-offset-hint { font-size: .73rem; color: #64748b; min-height: 3em; }
+.editor-row table { width: 100%; table-layout: fixed; border-spacing: 3px 6px; }
+.editor-row th { font-size: .75rem; color: #475569; }
+.editor-row th:first-child { width: 22px; }
+.editor-row td { padding: 0; }
+.editor-row td input { padding: 7px 3px; text-align: center; font-size: .85rem; }
+.editor-preview { text-align: center; position: sticky; top: 12px; padding: 10px; }
+.editor-preview svg { display: block; margin: 12px auto 0; }
+.editor-library ul { max-height: 220px; overflow: auto; overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .editor-workspace { grid-template-columns: minmax(0, 1fr); }
+  .editor-preview { position: static; grid-row: 1; }
+  .editor-preview svg { max-height: 360px; width: auto; }
+  .editor-rows { flex-direction: column; }
+  .editor-row { width: 100%; }
+  .editor-row td input { font-size: 1rem; }
+  .editor-metadata { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 520px) {
+  .app-navigation button { padding: 10px 8px; font-size: .82rem; }
+}

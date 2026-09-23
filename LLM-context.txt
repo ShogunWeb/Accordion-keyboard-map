@@ -2,7 +2,7 @@
 
 This file summarizes the project to give an LLM quick context before it
 starts working on this application. Reviewed against source code on
-2026-09-22. Treat the code and configuration as the source of truth;
+2026-09-23 (keyboard editor integration). Treat the code and configuration as the source of truth;
 re-validate this summary when they change.
 
 ## 1. Overview
@@ -11,7 +11,8 @@ PWA (React + TypeScript + Vite) that displays the right-hand keyboard of a
 diatonic/unisonoric accordion as SVG, and highlights the notes of a selected
 chord or scale (computed via Tonal.js). Also manages named songs containing
 unique chords, each shown on a complete keyboard, with browser-local storage
-and direct PDF download. Personal project, configured for GitHub Pages and
+and direct PDF download. A custom keyboard editor supports 2 or 3 rows with
+5–14 buttons per row, browser persistence and JSON import/export. Personal project, configured for GitHub Pages and
 licensed under AGPLv3+. Local features may not yet be deployed.
 
 - GitHub repo: https://github.com/ShogunWeb/Accordion-keyboard-map
@@ -73,15 +74,22 @@ src/
     ChordReferenceButton.tsx   # 12-page chord reference action and transient SVG snapshots
     ChordReferenceButton.css
     ChordReferenceButton.test.tsx
+    KeyboardEditor.tsx         # staged 2/3-row editor, preview, keyboard JSON exchange
+    KeyboardEditor.css
+    KeyboardEditor.test.tsx
     Songbook.tsx               # library, chord editor/cards, local translations, PDF action
     Songbook.css
     Songbook.test.tsx           # import preview, confirmation/remapping and export scopes
   hooks/
+    useKeyboards.ts             # synchronous custom catalog loading, explicit saves/imports
+    useKeyboards.test.ts
     useSongbook.ts              # library state and persistence, CRUD, duplicate prevention
     useSongbook.test.ts
   data/
     types.ts                   # shared types: ButtonLayout, KeyboardRow, KeyboardDefinition
     index.ts                   # loads all *.keyboard.ts files via import.meta.glob, sorts by name
+    customKeyboards.ts          # layout validation, note normalization, keyboard JSON files
+    customKeyboards.test.ts
     songs.ts                   # song/chord types, versioned storage schema and validation
     keyboards/
       dg.keyboard.ts           # id "DG" — D/G keyboard
@@ -106,6 +114,7 @@ scripts/
 docs/
   index.md, SUMMARY.md
   user/getting-started.md      # user docs, including song backup/restore
+  dev/keyboard-files.md       # custom layouts, storage and portable keyboard JSON
   dev/song-files.md           # portable JSON schema and import rules
   dev/architecture.md          # architecture overview; partly outdated (see §13)
   dev/data-model.md            # data model; normalization guidance is partly aspirational
@@ -140,12 +149,41 @@ default export of type `KeyboardDefinition`; it's auto-loaded by
 selector. Use a unique, stable `id` (also used in saved preferences).
 No need to touch a central file.
 
+### Custom keyboard editor and catalog
+
+- `useKeyboards()` loads `akm-custom-keyboards` synchronously before `useSongbook()`.
+  It returns the combined built-in/custom catalog. App stores the selected ID,
+  resolves its current definition on render, and passes the catalog to Songbook
+  and `useSongbook`. `parseSongbook(raw, availableKeyboards)` validates references
+  against that catalog; default callers still use the built-in catalog.
+- Local custom storage: `{ version: 1, keyboards: KeyboardDefinition[] }`. IDs
+  start with `custom-`; saves preserve the ID. Built-in keyboards can only be copied.
+  Loading never writes; invalid/unreadable storage disables writes and preserves
+  the original. Failed saves retain the draft and leave the catalog unchanged.
+- Custom layouts require exactly 2 or 3 rows, 5–14 buttons per row, consecutive
+  indices, a nonblank name (max 100 characters), integer offsets from −3 to +3
+  in half-button units. English/French note input and Unicode accidentals normalize
+  to ASCII letter names, with optional octave 0–8. Empty notes are allowed.
+- `KeyboardEditor` has named drafts, row counts/offsets, push/pull inputs, live
+  shared SVG preview, save/use/copy, and single/all JSON export. It stays mounted
+  while hidden to keep drafts across navigation. Nonempty row/button removal and
+  abandoning drafts require confirmation. Dirty drafts register an unload warning.
+- Portable JSON: `{ format: "accordion-keyboard-map/keyboards", version: 1,
+  keyboards: [...] }`, max 256 KiB, with full definitions and stable IDs. Imports
+  preview before confirmation; malformed records reject the entire file. Free IDs
+  are preserved; occupied IDs become fresh copies, and names receive suffixes.
+  No existing keyboards are overwritten. See `docs/dev/keyboard-files.md`.
+- Song JSON still contains only keyboard IDs. Import custom keyboards before songs
+  on another device; unmatched song references require the existing explicit mapping.
+- No custom keyboard deletion UI or cross-tab sync. Saved edits update the explorer,
+  song keyboards and subsequent PDFs without changing chord data.
+
 ## 6. Application logic (App.tsx)
 
 - Main state: selected keyboard, mode (`chord`/`scale`), root note,
   chord/scale type, language (`en`/`fr`), notation (`anglo`/`fr` = Do Re Mi),
   zoom level, legend visibility, side drawer open state (view "selection" or
-  "settings"). Additional session state: view (`keyboard`/`songs`), active
+  "settings"). Additional session state: view (`keyboard`/`songs`/`keyboards`), active
   song ID, and draft chord passed from the keyboard to the song editor.
 - `getSelectionHighlights(mode, root, type)` in `src/utils/musicUtils.ts`
   calls Tonal.js's `Chord.get()` or `Scale.get()`, normalizes notes to chroma
@@ -166,12 +204,12 @@ No need to touch a central file.
 - Persistence: `localStorage` under the `akm-settings` key, with fields
   `keyboardId`, `language`, `notation`, `fundamental`, `type`, `selectionMode`,
   `zoomIndex`, `showLegend`. Check restoration after reload when changing
-  initialization or mode handling; App preference restoration is not covered
-  by committed integration tests. Songbook persistence is separate (see §8).
+  initialization or mode handling; Custom keyboard selection restoration has an App integration test; broader
+  mode/language/zoom preference restoration is not covered. Songbook persistence is separate (see §8).
 - User feedback: text form that opens a `mailto:` link to
   accordion@shogunweb.be.
 - "Source code" link to the GitHub repo in the Settings panel.
-- Navigation switches between Keyboard and My songs without a router. Settings
+- Navigation switches between Keyboard, My songs and My keyboards without a router. Settings
   are available in both views; the closed drawer is inert and aria-hidden.
 - In chord mode, "Add to a song" opens My songs with the current chord
   preselected. The user still chooses/creates the target song and clicks Add.
@@ -299,7 +337,7 @@ type Song = {
   fonts cover French accents; unsupported characters in headings become `?`.
 - The download button is disabled for an empty song, missing keyboard, or export
   in progress. Failures produce an error message and allow another attempt.
-- Reference production build: initial JS ~78 KB gzip, exporter ~153 KB gzip
+- Reference production build: initial JS ~84 KB gzip, exporter ~153 KB gzip
   (sizes vary with changes). Optional jsPDF chunks may appear in dist without
   being needed by the SVG export path; inspect actual network requests before
   claiming their download cost.
@@ -375,6 +413,9 @@ type Song = {
 - `src/components/ChordReferenceButton.test.tsx` — 2 integration tests: full
   48-keyboard output, note highlighting across all roots/qualities, localized
   headings, settings snapshot, busy state and error recovery.
+- Keyboard editor validation on 2026-09-23: 93 tests pass in 11 files, including
+  27 new cases for layout/file validation, storage failures, custom song references,
+  editor limits, draft protection, imports and restored custom selection.
 - Baseline reviewed on 2026-09-22: 66 tests pass in 8 files. Lint and production
   build pass; build reports outdated Browserslist data (nonfatal).
 - Browser check on 2026-09-22: downloaded a PDF through Songbook in Chromium
@@ -385,6 +426,13 @@ type Song = {
   downloaded one/all songs, round-tripped into a fresh browser, imported without
   replacing existing songs, checked reload, invalid file rejection and unknown
   keyboard mapping. Import UI visually checked at 390 px with no overflow.
+- Browser editor check on 2026-09-23, Chromium against production preview:
+  created a 3 × 14-button custom layout, normalized French notes, adjusted offsets,
+  downloaded its JSON, created/reloaded a song on it, and downloaded a vector PDF
+  with all three 14-button rows. Imported the JSON into a fresh browser and checked
+  persisted definitions; verified saved edits update song rendering. Desktop and
+  mobile (390/320 px) had no horizontal overflow or browser errors. Screenshots
+  were reviewed. These checks do not establish offline or cross-browser behavior.
 - No committed browser end-to-end suite. Broader App interaction coverage and
   production/offline PDF behavior remain unverified; successful JSON transfer
   checks do not establish those.
@@ -409,8 +457,9 @@ type Song = {
   parser rejects that state during reload; consider a migration/recovery path
   before changing keyboard IDs.
 - Full App interaction/offline validation is still needed (see §12).
-- README lists "Import/export of keyboard JSON layouts" as a future
-  improvement, not yet implemented.
+- Custom keyboard deletion is not exposed. Existing keyboard IDs remain stable;
+  editing a custom layout updates every song using it. Keyboard and song backups
+  are separate: import keyboards first when transferring to a new browser.
 
 ## 14. Quick start
 

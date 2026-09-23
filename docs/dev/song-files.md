@@ -54,7 +54,8 @@ versions, invalid records/chords, or duplicates reject the whole file.
 The UI previews song names, chord counts and keyboards before adding anything.
 An unknown keyboard ID requires an explicit replacement from the installed
 catalog; every song using that unknown ID gets the selected replacement. The
-file does not embed a custom keyboard layout. Matching IDs refer to the local
+file does not embed a custom keyboard layout. Import a [keyboard file](keyboard-files.md)
+first on another device to make custom layouts available. Matching IDs refer to the local
 catalog version, so stable keyboard IDs remain important.
 
 `useSongbook.importSongs()` revalidates resolved data and adds the entire batch

@@ -588,3 +588,39 @@ a browser:
 - Update this context when architecture, commands, data conventions or PWA
   behavior change. Keep task-specific goals and progress in the session rather
   than recording temporary Git state or machine-specific paths here.
+
+## 16. Future development: online libraries and sharing
+
+Recorded from the product discussion on 2026-09-23. This is a future direction,
+not implemented functionality or confirmation that a Firebase project exists.
+
+User priorities:
+- Let users store their custom keyboards and songs online, retrieve them on
+  another device, and download creations shared by other users.
+- Preserve the simple application and its GitHub Pages / GitHub Actions
+  deployment. The owner does not want a server to administer.
+- **Email and password authentication is the priority.** Do not substitute
+  Google sign-in as the initial login method; it was an earlier suggestion,
+  superseded by the user's explicit preference.
+
+Proposed approach, to refine when implementation is requested:
+- Firebase Authentication for accounts and Cloud Firestore for structured
+  keyboard/song data, while the frontend remains on GitHub Pages. Start by
+  evaluating the free Spark plan; recheck current quotas and terms then.
+- Keep accounts optional for existing local/offline features and JSON exchange.
+  Require authentication for personal online storage and publication; allow
+  browsing/downloading public creations without an account.
+- Keep online creations private by default, with explicit publication. Use
+  access rules to restrict writes to the owner and private reads to that owner.
+- Start with explicit save/retrieve actions rather than automatic cross-device
+  synchronization. Import public creations as independent editable copies.
+- Include the required custom keyboard definition with shared songs; current
+  song JSON contains only keyboard IDs (see section 8), so sharing requires
+  addressing this dependency and ID collisions.
+- First implementation milestone: email/password registration, sign-in and
+  sign-out, with password reset and an email-verification flow. Then add private
+  online storage, followed by public sharing. Plan account/data deletion and
+  basic moderation of public content as part of the feature design.
+
+Initial setup discussed: create a Firebase project and register a web app to
+obtain its client configuration. No setup or integration is confirmed yet.
